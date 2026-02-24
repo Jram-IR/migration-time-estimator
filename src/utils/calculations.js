@@ -2,14 +2,6 @@
  * Migration time calculation logic
  */
 
-const DEBUG = true;
-
-function log(...args) {
-  if (DEBUG && typeof console !== 'undefined') {
-    console.log(...args);
-  }
-}
-
 /**
  * Calculate upper limit (entities per minute) from TPM and MaxWrites
  * TPS = TPM/60, entities/sec = floor(TPS/MaxWrites), entities/min = entities/sec * 60
@@ -18,11 +10,7 @@ export function calculateUpperLimit(tpm, maxWrites) {
   const safeMaxWrites = Math.max(1, Number(maxWrites) || 1);
   const tps = (Number(tpm) || 0) / 60;
   const entitiesPerSec = Math.floor(tps / safeMaxWrites);
-  const upperLimit = entitiesPerSec * 60;
-  if (DEBUG) {
-    log(`  [calculateUpperLimit] TPM=${tpm}, MaxWrites=${safeMaxWrites} => TPS=${tps.toFixed(2)}, entities/sec=${entitiesPerSec}, upperLimit=${upperLimit}/min`);
-  }
-  return upperLimit;
+  return entitiesPerSec * 60;
 }
 
 /**
@@ -32,79 +20,54 @@ export function calculateEffectiveConcurrency(batchSize, concurrency) {
   const numWaves = Math.ceil(batchSize / concurrency);
   let totalEntities = 0;
   let remaining = batchSize;
-  const waveSizes = [];
   for (let i = 0; i < numWaves; i++) {
     const waveSize = Math.min(concurrency, remaining);
-    waveSizes.push(waveSize);
     totalEntities += waveSize;
     remaining -= waveSize;
   }
-  const effectiveConcurrency = Math.floor(totalEntities / numWaves);
-  if (DEBUG) {
-    log(`  [calculateEffectiveConcurrency] batchSize=${batchSize}, concurrency=${concurrency} => numWaves=${numWaves}, waveSizes=[${waveSizes.join(',')}], effective=${effectiveConcurrency}`);
-  }
-  return effectiveConcurrency;
+  return Math.floor(totalEntities / numWaves);
 }
 
 /**
  * Calculate gross duration for a batch (in seconds)
- * grossDuration = (durationPerEntity * numWaves) + delay
  */
 export function calculateGrossDuration(batchSize, concurrency, durationPerEntity, delayInSeconds) {
   const numWaves = Math.ceil(batchSize / concurrency);
-  const durationFromWaves = durationPerEntity * numWaves;
-  const grossDuration = durationFromWaves + delayInSeconds;
-  if (DEBUG) {
-    log(`  [calculateGrossDuration] batchSize=${batchSize}, concurrency=${concurrency}, durationPerEntity=${durationPerEntity}s, delay=${delayInSeconds}s => numWaves=${numWaves}, grossDuration=${grossDuration}s`);
-  }
-  return grossDuration;
+  return (durationPerEntity * numWaves) + delayInSeconds;
 }
 
 /**
  * Calculate effective rate (entities per minute)
- * effective_rate = (batchSize / grossDuration) * 60
  */
 export function calculateEffectiveRate(batchSize, grossDuration) {
   if (grossDuration <= 0) return 0;
-  const rate = (batchSize / grossDuration) * 60;
-  if (DEBUG) {
-    log(`  [calculateEffectiveRate] batchSize=${batchSize}, grossDuration=${grossDuration}s => rate=${rate.toFixed(2)}/min`);
-  }
-  return rate;
+  return (batchSize / grossDuration) * 60;
 }
 
 /**
  * Check if effective rate has less than 20% leeway (warning threshold)
- * Safe if effective_rate <= 80% of upper limit
  */
 export function needsWarning(effectiveRate, upperLimit) {
   if (upperLimit <= 0) return false;
-  const safeThreshold = upperLimit * 0.8; // 80% = 20% leeway
-  const warn = effectiveRate > safeThreshold;
-  if (DEBUG && warn) {
-    log(`  [needsWarning] effectiveRate=${effectiveRate.toFixed(2)}, upperLimit=${upperLimit}, safeThreshold=${safeThreshold} => WARNING`);
-  }
-  return warn;
+  const safeThreshold = upperLimit * 0.8;
+  return effectiveRate > safeThreshold;
 }
 
 /**
  * Format minutes to hh:mm:ss
  */
 export function formatMigrationTime(totalMinutes) {
-  if (totalMinutes <= 0 || !isFinite(totalMinutes)) {
-    return '00:00:00';
-  }
+  if (totalMinutes <= 0 || !isFinite(totalMinutes)) return '00:00:00';
   const totalSeconds = Math.round(totalMinutes * 60);
   const hours = Math.floor(totalSeconds / 3600);
   const minutes = Math.floor((totalSeconds % 3600) / 60);
   const seconds = totalSeconds % 60;
-
   const pad = (n) => n.toString().padStart(2, '0');
   return `${pad(hours)}:${pad(minutes)}:${pad(seconds)}`;
 }
 
 /**
- * Full migration time estimation with comprehensive debug logging
+ * Full migration time estimation - returns result and report data for CSV export
  */
 export function estimateMigrationTime(params = {}) {
   const {
@@ -118,76 +81,42 @@ export function estimateMigrationTime(params = {}) {
     bufferTime = 0,
   } = params;
 
-  log('\n' + '='.repeat(80));
-  log('MIGRATION TIME ESTIMATION - FULL COMPUTATION');
-  log('='.repeat(80));
-  log('\n--- INPUTS ---');
-  log('batchSize:', batchSize);
-  log('concurrency:', concurrency);
-  log('delayInSeconds:', delayInSeconds);
-  log('cesLimits (TPM):', JSON.stringify(cesLimits));
-  log('durations (sec):', JSON.stringify(durations));
-  log('totals (counts):', JSON.stringify(totals));
-  log('maxWritesByEntity:', JSON.stringify(maxWritesByEntity));
-  log('bufferTime (%):', bufferTime);
-
   const entityTypes = ['Company', 'Site', 'Contact'];
   const upperLimits = {};
   const effectiveRates = {};
   const grossDurations = {};
   const hasWarnings = {};
+  const timeByEntity = {};
 
-  log('\n--- STEP 1: UPPER LIMITS (CES) ---');
   entityTypes.forEach((entity) => {
     const tpm = cesLimits[entity] || 0;
     const maxWrites = maxWritesByEntity[entity] || 1;
     upperLimits[entity] = calculateUpperLimit(tpm, maxWrites);
-    log(`${entity}: TPM=${tpm}, MaxWrites=${maxWrites} => Upper limit = ${upperLimits[entity]} entities/min`);
   });
 
-  log('\n--- STEP 2: GROSS DURATION & EFFECTIVE RATE ---');
   entityTypes.forEach((entity) => {
     const duration = durations[entity] || 0;
-    grossDurations[entity] = calculateGrossDuration(
-      batchSize,
-      concurrency,
-      duration,
-      delayInSeconds
-    );
+    grossDurations[entity] = calculateGrossDuration(batchSize, concurrency, duration, delayInSeconds);
     effectiveRates[entity] = calculateEffectiveRate(batchSize, grossDurations[entity]);
     hasWarnings[entity] = needsWarning(effectiveRates[entity], upperLimits[entity]);
-    log(`${entity}: Gross duration = ${grossDurations[entity]}s, Effective rate = ${effectiveRates[entity].toFixed(2)}/min, Warning = ${hasWarnings[entity]}`);
   });
 
-  log('\n--- STEP 3: TOTAL MIGRATION TIME ---');
   let totalMinutes = 0;
-  const timeByEntity = {};
   entityTypes.forEach((entity) => {
     const count = totals[entity] || 0;
     const rate = effectiveRates[entity] || 1;
     if (count > 0 && rate > 0) {
-      const entityMinutes = count / rate;
-      timeByEntity[entity] = entityMinutes;
-      totalMinutes += entityMinutes;
-      log(`${entity}: ${count} / ${rate.toFixed(2)} = ${entityMinutes.toFixed(2)} min`);
+      timeByEntity[entity] = count / rate;
+      totalMinutes += timeByEntity[entity];
     } else {
       timeByEntity[entity] = 0;
-      log(`${entity}: ${count} entities, rate ${rate.toFixed(2)} => skipped (0 min)`);
     }
   });
 
-  log('\n--- STEP 4: BUFFER ---');
   const bufferMultiplier = 1 + bufferTime / 100;
   const totalMinutesBeforeBuffer = totalMinutes;
   totalMinutes *= bufferMultiplier;
-  log(`Total before buffer: ${totalMinutesBeforeBuffer.toFixed(2)} min`);
-  log(`Buffer: ${bufferTime}% => multiplier = ${bufferMultiplier}`);
-  log(`Total after buffer: ${totalMinutes.toFixed(2)} min`);
-
   const formattedTime = formatMigrationTime(totalMinutes);
-  log('\n--- RESULT ---');
-  log('Estimated Migration Time:', formattedTime, `(${totalMinutes.toFixed(2)} minutes)`);
-  log('='.repeat(80) + '\n');
 
   return {
     migrationTime: formattedTime,
@@ -197,5 +126,82 @@ export function estimateMigrationTime(params = {}) {
     grossDurations,
     timeByEntity,
     hasWarnings,
+    report: {
+      batchSize,
+      concurrency,
+      delayInSeconds,
+      cesLimits,
+      durations,
+      totals,
+      maxWritesByEntity,
+      bufferTime,
+      upperLimits,
+      grossDurations,
+      effectiveRates,
+      timeByEntity,
+      totalMinutesBeforeBuffer,
+      bufferMultiplier,
+      totalMinutesAfterBuffer: totalMinutes,
+      formattedTime,
+    },
   };
+}
+
+/**
+ * Generate CSV content from migration estimation report
+ */
+export function generateReportCSV(report) {
+  if (!report) return '';
+
+  const r = report;
+  const rows = [
+    ['Migration Time Estimator - Calculation Summary', ''],
+    ['Generated', new Date().toISOString()],
+    [''],
+    ['--- INPUTS ---', ''],
+    ['Batch Size', r.batchSize],
+    ['Concurrency', r.concurrency],
+    ['Delay (seconds)', r.delayInSeconds],
+    ['Buffer Time (%)', r.bufferTime],
+    [''],
+    ['CES Limits (TPM)', 'Company', 'Site', 'Contact'],
+    ['', r.cesLimits?.Company ?? '', r.cesLimits?.Site ?? '', r.cesLimits?.Contact ?? ''],
+    [''],
+    ['Durations (sec)', 'Company', 'Site', 'Contact'],
+    ['', r.durations?.Company ?? '', r.durations?.Site ?? '', r.durations?.Contact ?? ''],
+    [''],
+    ['Total Counts', 'Company', 'Site', 'Contact'],
+    ['', r.totals?.Company ?? '', r.totals?.Site ?? '', r.totals?.Contact ?? ''],
+    [''],
+    ['Max Writes', 'Company', 'Site', 'Contact'],
+    ['', r.maxWritesByEntity?.Company ?? '', r.maxWritesByEntity?.Site ?? '', r.maxWritesByEntity?.Contact ?? ''],
+    [''],
+    ['--- STEP 1: UPPER LIMITS (entities/min) ---', ''],
+    ['Entity', 'Upper Limit'],
+    ['Company', r.upperLimits?.Company ?? ''],
+    ['Site', r.upperLimits?.Site ?? ''],
+    ['Contact', r.upperLimits?.Contact ?? ''],
+    [''],
+    ['--- STEP 2: GROSS DURATION & EFFECTIVE RATE ---', ''],
+    ['Entity', 'Gross Duration (sec)', 'Effective Rate (/min)'],
+    ['Company', r.grossDurations?.Company ?? '', r.effectiveRates?.Company?.toFixed(2) ?? ''],
+    ['Site', r.grossDurations?.Site ?? '', r.effectiveRates?.Site?.toFixed(2) ?? ''],
+    ['Contact', r.grossDurations?.Contact ?? '', r.effectiveRates?.Contact?.toFixed(2) ?? ''],
+    [''],
+    ['--- STEP 3: TIME BY ENTITY ---', ''],
+    ['Entity', 'Time (minutes)'],
+    ['Company', r.timeByEntity?.Company?.toFixed(2) ?? '0'],
+    ['Site', r.timeByEntity?.Site?.toFixed(2) ?? '0'],
+    ['Contact', r.timeByEntity?.Contact?.toFixed(2) ?? '0'],
+    ['Total (before buffer)', r.totalMinutesBeforeBuffer?.toFixed(2) ?? '0'],
+    [''],
+    ['--- STEP 4: BUFFER ---', ''],
+    ['Buffer multiplier', r.bufferMultiplier?.toFixed(2) ?? '1'],
+    ['Total after buffer (min)', r.totalMinutesAfterBuffer?.toFixed(2) ?? '0'],
+    [''],
+    ['--- RESULT ---', ''],
+    ['Estimated Migration Time', r.formattedTime ?? '00:00:00'],
+  ];
+
+  return rows.map(row => (Array.isArray(row) ? row : [row]).map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(',')).join('\n');
 }
