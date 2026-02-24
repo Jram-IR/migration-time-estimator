@@ -14,7 +14,6 @@ A React web application that calculates estimated migration time based on config
 ## Getting Started
 
 ```bash
-cd migration-estimator
 npm install
 npm run dev
 ```
