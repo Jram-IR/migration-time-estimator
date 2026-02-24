@@ -25,6 +25,10 @@ import {
   Grid,
   Card,
   CardContent,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
 } from '@mui/material';
 import {
   needsWarning,
@@ -74,6 +78,7 @@ function App() {
   const [maxWrites, setMaxWrites] = useState(DEFAULT_MAX_WRITES);
   const [bufferTime, setBufferTime] = useState(0);
   const [snackbar, setSnackbar] = useState({ open: false, message: '' });
+  const [warningsModalOpen, setWarningsModalOpen] = useState(false);
   const resultRef = useRef(null);
 
   useEffect(() => {
@@ -132,12 +137,11 @@ function App() {
 
   const hasWarningsObj = estimationResult.hasWarnings || {};
   const hasWarnings = Object.values(hasWarningsObj).some(Boolean);
-
-  const { migrationTime, effectiveRates, upperLimits } = {
-    migrationTime: estimationResult.migrationTime,
-    effectiveRates: estimationResult.effectiveRates || {},
-    upperLimits: estimationResult.upperLimits || {},
-  };
+  const effectiveRates = estimationResult.effectiveRates || {};
+  const upperLimits = estimationResult.upperLimits || {};
+  const warningEntities = ENTITY_TYPES.filter(entity => needsWarning(effectiveRates[entity] || 0, upperLimits[entity] || 0));
+  const hasInvalidMaxWrites = ENTITY_TYPES.some(e => (maxWrites[e] ?? 1) < 1);
+  const migrationTime = estimationResult.migrationTime;
 
   const handleCreateConfig = () => {
     if (!newConfigName.trim()) return;
@@ -192,7 +196,7 @@ function App() {
 
   const handleMaxWritesChange = (entity, value) => {
     const num = parseInteger(value);
-    setMaxWrites(prev => ({ ...prev, [entity]: num >= 1 ? num : 1 }));
+    setMaxWrites(prev => ({ ...prev, [entity]: num >= 0 ? num : 0 }));
   };
 
   const handleBufferChange = (value) => {
@@ -202,11 +206,64 @@ function App() {
 
   const isCustomPreset = selectedConfig !== 'Default' && savedConfigs.some(c => c.name === selectedConfig);
 
+  const displayMigrationTime = hasInvalidMaxWrites ? 'N/A' : migrationTime;
+
   return (
     <Box sx={{ minHeight: '100vh', background: 'linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%)', py: { xs: 2, sm: 4 }, px: { xs: 1.5, sm: 2 } }}>
       <Typography variant="h4" component="h1" sx={{ color: 'white', textAlign: 'center', mb: { xs: 3, sm: 4 }, fontWeight: 700, letterSpacing: 1, fontSize: { xs: '1.5rem', sm: '2rem' } }}>
         Migration Estimator
       </Typography>
+
+      {/* Warnings - outside main content, on top; clickable to open modal */}
+      {hasWarnings && (
+        <Box sx={{ maxWidth: '100%', margin: '0 auto', width: '100%', mb: 2, px: { xs: 0, sm: 1 } }}>
+          <Alert
+            severity="warning"
+            onClick={() => setWarningsModalOpen(true)}
+            sx={{
+              cursor: 'pointer',
+              '&:hover': { opacity: 0.95 },
+            }}
+          >
+            {warningEntities.length} rate limit warning{warningEntities.length !== 1 ? 's' : ''} — click to view details
+          </Alert>
+        </Box>
+      )}
+
+      <Dialog
+        open={warningsModalOpen}
+        onClose={() => setWarningsModalOpen(false)}
+        PaperProps={{
+          sx: {
+            background: 'linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%)',
+            color: 'white',
+            border: '1px solid rgba(255,255,255,0.2)',
+          },
+        }}
+      >
+        <DialogTitle sx={{ color: 'white' }}>Rate Limit Warnings</DialogTitle>
+        <DialogContent sx={{ color: 'white' }}>
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
+            {warningEntities.map(entity => (
+              <Box
+                key={entity}
+                sx={{
+                  p: 1.5,
+                  backgroundColor: 'rgba(255, 193, 7, 0.2)',
+                  border: '1px solid rgba(255, 193, 7, 0.5)',
+                  borderRadius: 1,
+                  color: 'white',
+                }}
+              >
+                {entity}: Effective rate ({Math.round(effectiveRates[entity])}/min) exceeds 80% of limit ({upperLimits[entity]}/min)
+              </Box>
+            ))}
+          </Box>
+        </DialogContent>
+        <DialogActions sx={{ px: 3, pb: 2 }}>
+          <Button onClick={() => setWarningsModalOpen(false)} sx={{ color: 'white' }}>Close</Button>
+        </DialogActions>
+      </Dialog>
 
       <Box sx={{ maxWidth: '100%', margin: '0 auto', width: '100%', px: { xs: 0, sm: 1 } }}>
         {/* Small screen: stacked. Large screen: 50% left (Migration+Entity) | 50% right (Config + CES) */}
@@ -236,36 +293,32 @@ function App() {
               },
             }}
           >
-            {/* Warnings + Migration Time */}
+            {/* Migration Time */}
             <Box sx={{ width: '100%', position: 'relative' }}>
-              {hasWarnings && (
-                <Box sx={{ display: 'flex', flexDirection: 'column', gap: '1px', mb: '1px' }}>
-                  {ENTITY_TYPES.filter(entity => needsWarning(effectiveRates[entity] || 0, upperLimits[entity] || 0)).map(entity => (
-                    <Alert key={entity} severity="warning" sx={{ py: 0.5 }}>
-                      {entity}: Effective rate ({Math.round(effectiveRates[entity])}/min) exceeds 80% of limit ({upperLimits[entity]}/min)
-                    </Alert>
-                  ))}
-                </Box>
-              )}
               <Typography variant="overline" sx={{ display: 'block', mb: 0.5, position: 'relative', color: 'white' }}>Estimated Migration Time</Typography>
               <Paper sx={{ width: '100%', p: { xs: 2, sm: 4 }, pt: { xs: 4, sm: 5 }, textAlign: 'center', backgroundColor: hasWarnings ? 'rgba(255, 193, 7, 0.2)' : 'rgba(76, 175, 80, 0.2)', border: 2, borderColor: hasWarnings ? 'warning.main' : 'primary.main', boxSizing: 'border-box', position: 'relative' }}>
                 <Button
                   variant="contained"
                   onClick={handleDownloadReport}
                   size="small"
+                  disabled={hasInvalidMaxWrites}
+                  disableElevation
                   sx={{
                     position: 'absolute',
-                    top: 8,
-                    right: 8,
+                    top: 0,
+                    right: 0,
+                    minWidth: 0,
+                    padding: 0,
                     backgroundColor: '#2e7d32',
                     color: 'white',
-                    '&:hover': { backgroundColor: '#1b5e20' },
+                    boxShadow: 'none',
+                    '&:hover': { backgroundColor: '#1b5e20', boxShadow: 'none' },
                   }}
                 >
                   ⬇ Download Report
                 </Button>
                 <Typography variant="h2" component="div" sx={{ fontWeight: 700, color: 'primary.main', fontFamily: 'monospace', letterSpacing: { xs: 1, sm: 4 }, fontSize: { xs: '2rem', sm: '3rem' } }}>
-                  {migrationTime}
+                  {displayMigrationTime}
                 </Typography>
               </Paper>
             </Box>
