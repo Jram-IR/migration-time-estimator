@@ -237,7 +237,7 @@ function App() {
             }}
           >
             {/* Warnings + Migration Time */}
-            <Box sx={{ width: '100%' }}>
+            <Box sx={{ width: '100%', position: 'relative' }}>
               {hasWarnings && (
                 <Box sx={{ display: 'flex', flexDirection: 'column', gap: '1px', mb: '1px' }}>
                   {ENTITY_TYPES.filter(entity => needsWarning(effectiveRates[entity] || 0, upperLimits[entity] || 0)).map(entity => (
@@ -247,27 +247,35 @@ function App() {
                   ))}
                 </Box>
               )}
-              <Paper sx={{ width: '100%', p: { xs: 2, sm: 4 }, textAlign: 'center', backgroundColor: hasWarnings ? 'rgba(255, 193, 7, 0.2)' : 'rgba(76, 175, 80, 0.2)', border: 2, borderColor: hasWarnings ? 'warning.main' : 'primary.main', boxSizing: 'border-box' }}>
-                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 1 }}>
-                  <Box sx={{ flex: 1, minWidth: 0 }}>
-                    <Typography variant="overline" color="text.secondary">Estimated Migration Time</Typography>
-                    <Typography variant="h2" component="div" sx={{ fontWeight: 700, color: 'primary.main', fontFamily: 'monospace', letterSpacing: { xs: 1, sm: 4 }, mt: 1, fontSize: { xs: '2rem', sm: '3rem' } }}>
-                      {migrationTime}
-                    </Typography>
-                  </Box>
-                  <Button variant="outlined" onClick={handleDownloadReport} size="small">
-                    ⬇ Download Report
-                  </Button>
-                </Box>
+              <Typography variant="overline" color="text.secondary" sx={{ display: 'block', mb: 0.5, position: 'relative' }}>Estimated Migration Time</Typography>
+              <Paper sx={{ width: '100%', p: { xs: 2, sm: 4 }, pt: { xs: 4, sm: 5 }, textAlign: 'center', backgroundColor: hasWarnings ? 'rgba(255, 193, 7, 0.2)' : 'rgba(76, 175, 80, 0.2)', border: 2, borderColor: hasWarnings ? 'warning.main' : 'primary.main', boxSizing: 'border-box', position: 'relative' }}>
+                <Button
+                  variant="contained"
+                  onClick={handleDownloadReport}
+                  size="small"
+                  sx={{
+                    position: 'absolute',
+                    top: 8,
+                    right: 8,
+                    backgroundColor: '#2e7d32',
+                    color: 'white',
+                    '&:hover': { backgroundColor: '#1b5e20' },
+                  }}
+                >
+                  ⬇ Download Report
+                </Button>
+                <Typography variant="h2" component="div" sx={{ fontWeight: 700, color: 'primary.main', fontFamily: 'monospace', letterSpacing: { xs: 1, sm: 4 }, fontSize: { xs: '2rem', sm: '3rem' } }}>
+                  {migrationTime}
+                </Typography>
               </Paper>
             </Box>
 
             {/* Entity Configuration - on small screen same width as Config+CES via flex */}
             <Paper sx={{ width: '100%', p: '15px', backgroundColor: 'rgba(255,255,255,0.95)', boxSizing: 'border-box', '@media (min-width: 960px)': { minWidth: 400, maxWidth: 400 } }}>
               <Typography variant="h6" gutterBottom>Entity Configuration</Typography>
-              <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
+              <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap', width: '100%' }}>
                 {ENTITY_TYPES.map(entity => (
-                  <Card key={entity} variant="outlined" sx={{ flex: '0 0 200px', minWidth: 200, maxWidth: 200 }}>
+                  <Card key={entity} variant="outlined" sx={{ flex: '1 1 0', minWidth: 0 }}>
                     <CardContent>
                       <Typography variant="subtitle2" color="primary">{entity}</Typography>
                       <TextField fullWidth size="small" label="Duration (sec)" type="text" inputMode="numeric" value={durations[entity] ?? ''} onChange={(e) => handleDurationChange(entity, e.target.value)} sx={{ mt: 1 }} />
@@ -283,7 +291,6 @@ function App() {
           {/* Column 2 & 3 (large screen) or Row 2 (small screen): Configuration | CES Write Limits */}
           <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3, '@media (min-width: 500px)': { flexDirection: 'row' }, '@media (min-width: 960px)': { flex: 1, minWidth: 0 } }}>
             <Paper sx={{ flex: 1, minWidth: 280, p: { xs: 2, sm: 3 }, backgroundColor: 'rgba(255,255,255,0.95)', minHeight: 320 }}>
-              <Typography variant="h6" gutterBottom>Configuration</Typography>
               <Typography variant="h6" gutterBottom>Configuration</Typography>
             <Box sx={{ mb: 2 }}>
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 0.5 }}>
