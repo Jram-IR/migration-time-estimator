@@ -237,22 +237,7 @@ function App() {
           </Paper>
         </Grid>
 
-        {/* Row 2: Buffer time - separate card */}
-        <Grid item xs={12}>
-          <Paper sx={{ p: 2, backgroundColor: 'rgba(255,255,255,0.95)' }}>
-            <TextField
-              size="small"
-              label="Buffer time (%)"
-              type="text"
-              inputMode="numeric"
-              value={bufferTime === 0 ? '' : String(bufferTime)}
-              onChange={(e) => handleBufferChange(e.target.value)}
-              sx={{ width: 200 }}
-            />
-          </Paper>
-        </Grid>
-
-        {/* Row 3: Configuration | CES Write Limits - Side by side (flex keeps them together) */}
+        {/* Row 2: Configuration | CES Write Limits - Side by side */}
         <Grid item xs={12}>
           <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3, '@media (min-width: 500px)': { flexDirection: 'row' } }}>
             <Paper sx={{ flex: 1, minWidth: 280, p: { xs: 2, sm: 3 }, backgroundColor: 'rgba(255,255,255,0.95)', minHeight: 320 }}>
@@ -282,6 +267,17 @@ function App() {
                 <FormControlLabel value="sec" control={<Radio size="small" />} label="Seconds" />
                 <FormControlLabel value="min" control={<Radio size="small" />} label="Minutes" />
               </RadioGroup>
+            </Box>
+            <Box sx={{ mt: 2 }}>
+              <TextField
+                size="small"
+                label="Buffer time (%)"
+                type="text"
+                inputMode="numeric"
+                value={bufferTime === 0 ? '' : String(bufferTime)}
+                onChange={(e) => handleBufferChange(e.target.value)}
+                sx={{ width: 200 }}
+              />
             </Box>
             </Paper>
             <Paper sx={{ flex: 1, minWidth: 280, p: { xs: 2, sm: 3 }, backgroundColor: 'rgba(255,255,255,0.95)', minHeight: 320, position: 'relative' }}>
@@ -333,24 +329,22 @@ function App() {
           </Box>
         </Grid>
 
-        {/* Row 4: Entity Configuration */}
+        {/* Row 3: Entity Configuration - 3 columns side by side */}
         <Grid item xs={12}>
           <Paper sx={{ p: '15px', backgroundColor: 'rgba(255,255,255,0.95)', width: 'fit-content', maxWidth: '100%', boxSizing: 'border-box' }}>
             <Typography variant="h6" gutterBottom>Entity Configuration</Typography>
-            <Grid container spacing={2} sx={{ margin: 0, width: '100%' }}>
+            <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
               {ENTITY_TYPES.map(entity => (
-                <Grid item xs={12} sm={4} key={entity}>
-                  <Card variant="outlined" sx={{ height: '100%' }}>
-                    <CardContent>
+                <Card key={entity} variant="outlined" sx={{ flex: '0 0 200px', minWidth: 200, maxWidth: 200 }}>
+                  <CardContent>
                       <Typography variant="subtitle2" color="primary">{entity}</Typography>
                       <TextField fullWidth size="small" label="Duration (sec)" type="text" inputMode="numeric" value={durations[entity] ?? ''} onChange={(e) => handleDurationChange(entity, e.target.value)} sx={{ mt: 1 }} />
                       <TextField fullWidth size="small" label="Total count" value={formatWithCommas(totals[entity] ?? 0)} onChange={(e) => handleTotalChange(entity, e.target.value)} placeholder="0" inputProps={{ inputMode: 'numeric' }} sx={{ mt: 1 }} />
                       <TextField fullWidth size="small" label="Max writes" type="text" inputMode="numeric" value={maxWrites[entity] ?? ''} onChange={(e) => handleMaxWritesChange(entity, e.target.value)} sx={{ mt: 1 }} />
-                    </CardContent>
-                  </Card>
-                </Grid>
+                  </CardContent>
+                </Card>
               ))}
-            </Grid>
+            </Box>
           </Paper>
         </Grid>
       </Grid>
