@@ -26,8 +26,6 @@ import {
   Card,
   CardContent,
 } from '@mui/material';
-import SaveIcon from '@mui/icons-material/Save';
-import DownloadIcon from '@mui/icons-material/Download';
 import {
   needsWarning,
   estimateMigrationTime,
@@ -246,8 +244,8 @@ function App() {
                   </Alert>
                 )}
               </Box>
-              <Button variant="outlined" startIcon={<DownloadIcon />} onClick={handleDownloadReport} size="small">
-                Download Report
+              <Button variant="outlined" onClick={handleDownloadReport} size="small">
+                ⬇ Download Report
               </Button>
             </Box>
           </Paper>
@@ -305,7 +303,7 @@ function App() {
           <Paper sx={{ p: { xs: 2, sm: 3 }, backgroundColor: 'rgba(255,255,255,0.95)', height: '100%', position: 'relative' }}>
             {isCustomPreset && (
               <IconButton onClick={handleUpdateConfig} sx={{ position: 'absolute', top: 8, right: 8 }} color="primary" title="Save preset" aria-label="Save preset">
-                <SaveIcon />
+                <span style={{ fontSize: 20 }}>💾</span>
               </IconButton>
             )}
             <Typography variant="h6" gutterBottom>CES Write Limits</Typography>
