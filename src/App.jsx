@@ -208,8 +208,8 @@ function App() {
         Migration Estimator
       </Typography>
 
-      <Box sx={{ maxWidth: 1200, margin: '0 auto', width: '100%' }}>
-        {/* Small screen: stacked. Large screen: 3 columns (Col1: Migration+Entity | Col2: Config | Col3: CES) */}
+      <Box sx={{ maxWidth: '100%', margin: '0 auto', width: '100%', px: { xs: 0, sm: 1 } }}>
+        {/* Small screen: stacked. Large screen: 50% left (Migration+Entity) | 50% right (Config + CES) */}
         <Box
           sx={{
             display: 'flex',
@@ -217,11 +217,11 @@ function App() {
             gap: 3,
             '@media (min-width: 960px)': {
               flexDirection: 'row',
-              alignItems: 'flex-start',
+              alignItems: 'stretch',
             },
           }}
         >
-          {/* Column 1 (large screen) or Rows 1+3 (small screen): Migration Time + Entity Config */}
+          {/* Column 1 (50% on large screen): Migration Time + Entity Config */}
           <Box
             sx={{
               display: 'flex',
@@ -230,9 +230,9 @@ function App() {
               flex: 1,
               minWidth: 0,
               '@media (min-width: 960px)': {
-                flex: '0 0 400px',
-                minWidth: 400,
-                maxWidth: 400,
+                flex: '0 0 50%',
+                minWidth: 0,
+                maxWidth: '50%',
               },
             }}
           >
@@ -247,7 +247,7 @@ function App() {
                   ))}
                 </Box>
               )}
-              <Typography variant="overline" color="text.secondary" sx={{ display: 'block', mb: 0.5, position: 'relative' }}>Estimated Migration Time</Typography>
+              <Typography variant="overline" sx={{ display: 'block', mb: 0.5, position: 'relative', color: 'white' }}>Estimated Migration Time</Typography>
               <Paper sx={{ width: '100%', p: { xs: 2, sm: 4 }, pt: { xs: 4, sm: 5 }, textAlign: 'center', backgroundColor: hasWarnings ? 'rgba(255, 193, 7, 0.2)' : 'rgba(76, 175, 80, 0.2)', border: 2, borderColor: hasWarnings ? 'warning.main' : 'primary.main', boxSizing: 'border-box', position: 'relative' }}>
                 <Button
                   variant="contained"
@@ -270,10 +270,10 @@ function App() {
               </Paper>
             </Box>
 
-            {/* Entity Configuration - on small screen same width as Config+CES via flex */}
-            <Paper sx={{ width: '100%', p: '15px', backgroundColor: 'rgba(255,255,255,0.95)', boxSizing: 'border-box', '@media (min-width: 960px)': { minWidth: 400, maxWidth: 400 } }}>
+            {/* Entity Configuration - stretches to match right column height on large screen */}
+            <Paper sx={{ width: '100%', p: '15px', backgroundColor: 'rgba(255,255,255,0.95)', boxSizing: 'border-box', display: 'flex', flexDirection: 'column', minHeight: 0, '@media (min-width: 960px)': { flex: 1 } }}>
               <Typography variant="h6" gutterBottom>Entity Configuration</Typography>
-              <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap', width: '100%' }}>
+              <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap', width: '100%', flex: 1, minHeight: 0 }}>
                 {ENTITY_TYPES.map(entity => (
                   <Card key={entity} variant="outlined" sx={{ flex: '1 1 0', minWidth: 0 }}>
                     <CardContent>
@@ -288,8 +288,8 @@ function App() {
             </Paper>
           </Box>
 
-          {/* Column 2 & 3 (large screen) or Row 2 (small screen): Configuration | CES Write Limits */}
-          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3, '@media (min-width: 500px)': { flexDirection: 'row' }, '@media (min-width: 960px)': { flex: 1, minWidth: 0 } }}>
+          {/* Column 2 & 3 (50% on large screen): Configuration | CES Write Limits */}
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3, '@media (min-width: 500px)': { flexDirection: 'row' }, '@media (min-width: 960px)': { flex: '0 0 50%', minWidth: 0, maxWidth: '50%' } }}>
             <Paper sx={{ flex: 1, minWidth: 280, p: { xs: 2, sm: 3 }, backgroundColor: 'rgba(255,255,255,0.95)', minHeight: 320 }}>
               <Typography variant="h6" gutterBottom>Configuration</Typography>
             <Box sx={{ mb: 2 }}>
