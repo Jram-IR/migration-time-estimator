@@ -46,7 +46,7 @@ function formatWithCommas(num) {
   return Math.floor(n).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ',');
 }
 
-function parseFormattedNumber(str) {
+function parseInteger(str) {
   const digits = (str || '').replace(/\D/g, '');
   return digits === '' ? 0 : parseInt(digits, 10);
 }
@@ -108,8 +108,8 @@ function App() {
   const estimationResult = useMemo(() => {
     try {
       return estimateMigrationTime({
-        batchSize,
-        concurrency,
+        batchSize: Math.max(1, batchSize),
+        concurrency: Math.max(1, concurrency),
         delayInSeconds,
         cesLimits,
         durations,
@@ -175,33 +175,27 @@ function App() {
   };
 
   const handleTPMChange = (entity, value) => {
-    const num = parseInt(value, 10);
-    if (!isNaN(num) && num >= 0) setCesLimits(prev => ({ ...prev, [entity]: num }));
-    else if (value === '') setCesLimits(prev => ({ ...prev, [entity]: 0 }));
+    const num = parseInteger(value);
+    setCesLimits(prev => ({ ...prev, [entity]: num >= 0 ? num : 0 }));
   };
 
   const handleDurationChange = (entity, value) => {
-    const num = parseInt(value, 10);
-    if (!isNaN(num) && num >= 0) setDurations(prev => ({ ...prev, [entity]: num }));
-    else if (value === '') setDurations(prev => ({ ...prev, [entity]: 0 }));
+    const num = parseInteger(value);
+    setDurations(prev => ({ ...prev, [entity]: num >= 0 ? num : 0 }));
   };
 
   const handleTotalChange = (entity, value) => {
-    setTotals(prev => ({ ...prev, [entity]: parseFormattedNumber(value) }));
+    setTotals(prev => ({ ...prev, [entity]: parseInteger(value) }));
   };
 
   const handleMaxWritesChange = (entity, value) => {
-    const num = parseInt(value, 10);
-    if (!isNaN(num) && num >= 1) setMaxWrites(prev => ({ ...prev, [entity]: num }));
-    else if (value === '') setMaxWrites(prev => ({ ...prev, [entity]: 1 }));
+    const num = parseInteger(value);
+    setMaxWrites(prev => ({ ...prev, [entity]: num >= 1 ? num : 1 }));
   };
 
   const handleBufferChange = (value) => {
-    if (value === '') setBufferTime(0);
-    else {
-      const num = parseInt(value, 10);
-      if (!isNaN(num) && num >= 0) setBufferTime(num);
-    }
+    const num = parseInteger(value);
+    setBufferTime(num >= 0 ? num : 0);
   };
 
   const isCustomPreset = selectedConfig !== 'Default' && savedConfigs.some(c => c.name === selectedConfig);
@@ -214,8 +208,8 @@ function App() {
         Migration Estimator
       </Typography>
 
-      <Grid container spacing={gridSpacing} sx={{ maxWidth: 1200, margin: '0 auto' }}>
-        {/* Estimated Migration Time - Top */}
+      <Grid container spacing={gridSpacing} sx={{ maxWidth: 1200, margin: '0 auto', width: '100%' }}>
+        {/* Row 1: Migration Time + Buffer (nested in same Paper) */}
         <Grid item xs={12}>
           <Paper sx={{ p: { xs: 2, sm: 4 }, textAlign: 'center', backgroundColor: hasWarnings ? 'rgba(255, 193, 7, 0.2)' : 'rgba(76, 175, 80, 0.2)', border: 2, borderColor: hasWarnings ? 'warning.main' : 'primary.main' }}>
             <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 1 }}>
@@ -248,46 +242,42 @@ function App() {
                 ⬇ Download Report
               </Button>
             </Box>
+            <Box sx={{ mt: 3, pt: 3, borderTop: 1, borderColor: 'divider', display: 'flex', justifyContent: 'center' }}>
+              <TextField
+                size="small"
+                label="Buffer time (%)"
+                type="text"
+                inputMode="numeric"
+                value={bufferTime === 0 ? '' : String(bufferTime)}
+                onChange={(e) => handleBufferChange(e.target.value)}
+                sx={{ maxWidth: 200, width: '100%' }}
+              />
+            </Box>
           </Paper>
         </Grid>
 
-        {/* Buffer - Below Migration Time, centered and symmetrical */}
-        <Grid item xs={12}>
-          <Paper sx={{ p: { xs: 2, sm: 3 }, backgroundColor: 'rgba(255,255,255,0.95)', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
-            <TextField
-              size="small"
-              label="Buffer time (%)"
-              type="number"
-              value={bufferTime}
-              onChange={(e) => handleBufferChange(e.target.value)}
-              inputProps={{ min: 0 }}
-              sx={{ maxWidth: 280, width: '100%' }}
-            />
-          </Paper>
-        </Grid>
-
-        {/* Configuration | CES Write Limits - Side by side */}
+        {/* Row 2: Configuration | CES Write Limits - Side by side */}
         <Grid item xs={12} md={6}>
-          <Paper sx={{ p: { xs: 2, sm: 3 }, backgroundColor: 'rgba(255,255,255,0.95)', height: '100%' }}>
+          <Paper sx={{ p: { xs: 2, sm: 3 }, backgroundColor: 'rgba(255,255,255,0.95)', height: '100%', minHeight: 320 }}>
             <Typography variant="h6" gutterBottom>Configuration</Typography>
             <Box sx={{ mb: 2 }}>
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 0.5 }}>
                 <Typography flex={1}>Batch Size</Typography>
-                <TextField size="small" type="number" value={batchSize} onChange={(e) => { const v = parseInt(e.target.value, 10); if (!isNaN(v) && v >= 1 && v <= 1000) setBatchSize(v); }} inputProps={{ min: 1, max: 1000 }} sx={{ width: 80 }} />
+                <TextField size="small" type="text" inputMode="numeric" value={batchSize === 0 ? '' : batchSize} onChange={(e) => { const v = parseInteger(e.target.value); setBatchSize(v <= 1000 ? v : 1000); }} sx={{ width: 80 }} />
               </Box>
               <Slider value={batchSize} onChange={(_, v) => setBatchSize(v)} min={1} max={1000} valueLabelDisplay="auto" />
             </Box>
             <Box sx={{ mb: 2 }}>
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 0.5 }}>
                 <Typography flex={1}>Concurrency</Typography>
-                <TextField size="small" type="number" value={concurrency} onChange={(e) => { const v = parseInt(e.target.value, 10); if (!isNaN(v) && v >= 1 && v <= 500) setConcurrency(v); }} inputProps={{ min: 1, max: 500 }} sx={{ width: 80 }} />
+                <TextField size="small" type="text" inputMode="numeric" value={concurrency === 0 ? '' : concurrency} onChange={(e) => { const v = parseInteger(e.target.value); setConcurrency(v <= 500 ? v : 500); }} sx={{ width: 80 }} />
               </Box>
               <Slider value={concurrency} onChange={(_, v) => setConcurrency(v)} min={1} max={500} valueLabelDisplay="auto" />
             </Box>
             <Box>
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 0.5 }}>
                 <Typography flex={1}>Delay</Typography>
-                <TextField size="small" type="number" value={delay} onChange={(e) => { const v = parseInt(e.target.value, 10); const max = delayUnit === 'sec' ? 600 : 30; if (!isNaN(v) && v >= 0 && v <= max) setDelay(v); }} inputProps={{ min: 0 }} sx={{ width: 80 }} />
+                <TextField size="small" type="text" inputMode="numeric" value={delay} onChange={(e) => { const v = parseInteger(e.target.value); const max = delayUnit === 'sec' ? 600 : 30; setDelay(v >= 0 && v <= max ? v : delay); }} sx={{ width: 80 }} />
                 <Typography variant="body2">{delayUnit}</Typography>
               </Box>
               <Slider value={delay} onChange={(_, v) => setDelay(v)} min={0} max={delayUnit === 'sec' ? 600 : 30} valueLabelDisplay="auto" />
@@ -300,12 +290,14 @@ function App() {
         </Grid>
 
         <Grid item xs={12} md={6}>
-          <Paper sx={{ p: { xs: 2, sm: 3 }, backgroundColor: 'rgba(255,255,255,0.95)', height: '100%', position: 'relative' }}>
-            {isCustomPreset && (
-              <IconButton onClick={handleUpdateConfig} sx={{ position: 'absolute', top: 8, right: 8 }} color="primary" title="Save preset" aria-label="Save preset">
-                <span style={{ fontSize: 20 }}>💾</span>
-              </IconButton>
-            )}
+          <Paper sx={{ p: { xs: 2, sm: 3 }, backgroundColor: 'rgba(255,255,255,0.95)', height: '100%', minHeight: 320, minWidth: 320, position: 'relative' }}>
+            <Box sx={{ position: 'absolute', top: 8, right: 8, width: 40, display: 'flex', justifyContent: 'flex-end' }}>
+              {isCustomPreset ? (
+                <IconButton onClick={handleUpdateConfig} color="primary" title="Save preset" aria-label="Save preset">
+                  <span style={{ fontSize: 20 }}>💾</span>
+                </IconButton>
+              ) : null}
+            </Box>
             <Typography variant="h6" gutterBottom>CES Write Limits</Typography>
             {selectedConfig === 'Default' && (
               <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 2 }}>
@@ -327,7 +319,7 @@ function App() {
                     <TableRow key={entity}>
                       <TableCell>{entity}</TableCell>
                       <TableCell align="right">
-                        <TextField type="number" size="small" value={cesLimits[entity] ?? ''} onChange={(e) => handleTPMChange(entity, e.target.value)} inputProps={{ min: 0 }} sx={{ width: 100 }} />
+                        <TextField type="text" inputMode="numeric" size="small" value={cesLimits[entity] ?? ''} onChange={(e) => handleTPMChange(entity, e.target.value)} sx={{ width: 100 }} />
                       </TableCell>
                     </TableRow>
                   ))}
@@ -336,7 +328,7 @@ function App() {
             </TableContainer>
             <Box sx={{ mt: 2, display: 'flex', gap: 1, flexWrap: 'wrap', alignItems: 'center' }}>
               <TextField size="small" placeholder="Preset name" value={newConfigName} onChange={(e) => setNewConfigName(e.target.value)} sx={{ flex: 1, minWidth: 120 }} />
-              <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
+              <Box sx={{ display: 'flex', gap: 1, alignItems: 'center', minWidth: 90, justifyContent: 'flex-end' }}>
                 <Button variant="contained" onClick={handleCreateConfig} size="small">Create</Button>
                 {isCustomPreset && (
                   <IconButton color="error" onClick={handleDeleteConfig} size="small" title="Delete preset" aria-label="Delete preset">✕</IconButton>
@@ -346,9 +338,9 @@ function App() {
           </Paper>
         </Grid>
 
-        {/* Entity Configuration - 3 symmetric cards */}
-        <Grid item xs={12}>
-          <Paper sx={{ p: { xs: 2, sm: 3 }, backgroundColor: 'rgba(255,255,255,0.95)' }}>
+        {/* Row 3: Entity Configuration */}
+        <Grid item xs={12} sx={{ display: 'flex', justifyContent: 'center' }}>
+          <Paper sx={{ p: { xs: 2, sm: 3 }, backgroundColor: 'rgba(255,255,255,0.95)', width: 'fit-content', minWidth: 320 }}>
             <Typography variant="h6" gutterBottom>Entity Configuration</Typography>
             <Grid container spacing={gridSpacing}>
               {ENTITY_TYPES.map(entity => (
@@ -356,9 +348,9 @@ function App() {
                   <Card variant="outlined" sx={{ height: '100%' }}>
                     <CardContent>
                       <Typography variant="subtitle2" color="primary">{entity}</Typography>
-                      <TextField fullWidth size="small" label="Duration (sec)" type="number" value={durations[entity] ?? ''} onChange={(e) => handleDurationChange(entity, e.target.value)} inputProps={{ min: 0 }} sx={{ mt: 1 }} />
+                      <TextField fullWidth size="small" label="Duration (sec)" type="text" inputMode="numeric" value={durations[entity] ?? ''} onChange={(e) => handleDurationChange(entity, e.target.value)} sx={{ mt: 1 }} />
                       <TextField fullWidth size="small" label="Total count" value={formatWithCommas(totals[entity] ?? 0)} onChange={(e) => handleTotalChange(entity, e.target.value)} placeholder="0" inputProps={{ inputMode: 'numeric' }} sx={{ mt: 1 }} />
-                      <TextField fullWidth size="small" label="Max writes" type="number" value={maxWrites[entity] ?? ''} onChange={(e) => handleMaxWritesChange(entity, e.target.value)} inputProps={{ min: 1 }} sx={{ mt: 1 }} />
+                      <TextField fullWidth size="small" label="Max writes" type="text" inputMode="numeric" value={maxWrites[entity] ?? ''} onChange={(e) => handleMaxWritesChange(entity, e.target.value)} sx={{ mt: 1 }} />
                     </CardContent>
                   </Card>
                 </Grid>
