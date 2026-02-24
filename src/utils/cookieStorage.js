@@ -40,3 +40,10 @@ export function addCESLimitToCookie(limitConfig) {
   saveCESLimitsToCookie(updated);
   return updated;
 }
+
+export function deleteCESLimitFromCookie(name) {
+  const limits = getCESLimitsFromCookie();
+  const updated = limits.filter(l => l.name !== name);
+  saveCESLimitsToCookie(updated);
+  return updated;
+}

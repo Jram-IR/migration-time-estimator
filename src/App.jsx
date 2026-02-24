@@ -16,6 +16,7 @@ import {
   Select,
   MenuItem,
   Button,
+  ButtonGroup,
   Alert,
   Snackbar,
   FormControlLabel,
@@ -24,28 +25,39 @@ import {
   Grid,
   Card,
   CardContent,
+  IconButton,
 } from '@mui/material';
+import DeleteIcon from '@mui/icons-material/Delete';
+import SaveIcon from '@mui/icons-material/Save';
 import {
-  calculateUpperLimit,
-  calculateGrossDuration,
-  calculateEffectiveRate,
   needsWarning,
-  formatMigrationTime,
+  estimateMigrationTime,
 } from './utils/calculations';
-import { getCESLimitsFromCookie, addCESLimitToCookie } from './utils/cookieStorage';
+import { getCESLimitsFromCookie, addCESLimitToCookie, deleteCESLimitFromCookie } from './utils/cookieStorage';
 import './App.css';
 
 const ENTITY_TYPES = ['Company', 'Site', 'Contact'];
 const DEFAULT_TPM = { Company: 5600, Site: 7300, Contact: 10000 };
 const DEFAULT_DURATIONS = { Company: 20, Site: 5, Contact: 5 };
 const DEFAULT_TOTALS = { Company: 0, Site: 0, Contact: 0 };
+const DEFAULT_MAX_WRITES = { Company: 16, Site: 16, Contact: 16 };
+
+function formatWithCommas(num) {
+  if (num === 0) return '0';
+  return num.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+}
+
+function parseFormattedNumber(str) {
+  const digits = (str || '').replace(/\D/g, '');
+  return digits === '' ? 0 : parseInt(digits, 10);
+}
 
 function App() {
   // Component 1: Sliders
   const [batchSize, setBatchSize] = useState(100);
   const [concurrency, setConcurrency] = useState(50);
   const [delay, setDelay] = useState(30);
-  const [delayUnit, setDelayUnit] = useState('sec'); // 'sec' or 'min'
+  const [delayUnit, setDelayUnit] = useState('sec');
 
   // Component 2: CES Limits
   const [cesLimits, setCesLimits] = useState({ Company: 5600, Site: 7300, Contact: 10000 });
@@ -56,14 +68,13 @@ function App() {
   // Component 3: Durations and totals
   const [durations, setDurations] = useState(DEFAULT_DURATIONS);
   const [totals, setTotals] = useState(DEFAULT_TOTALS);
+  const [maxWrites, setMaxWrites] = useState(DEFAULT_MAX_WRITES);
 
-  // Elements 1 & 2
+  // Elements
   const [bufferTime, setBufferTime] = useState(0);
-  const [maxWrites, setMaxWrites] = useState(16);
 
-  // Warnings
-  const [warningSnackbar, setWarningSnackbar] = useState({ open: false, message: '' });
-  // Load saved configs from cookie on mount
+  const [snackbar, setSnackbar] = useState({ open: false, message: '' });
+
   useEffect(() => {
     const saved = getCESLimitsFromCookie();
     if (saved && saved.length > 0) {
@@ -75,125 +86,94 @@ function App() {
     }
   }, []);
 
-  // Load config when selection changes
   useEffect(() => {
     if (selectedConfig === 'Default') {
       setCesLimits(DEFAULT_TPM);
     } else if (selectedConfig && savedConfigs.length > 0) {
       const config = savedConfigs.find(c => c.name === selectedConfig);
-      if (config) {
-        setCesLimits(config.limits);
-      }
+      if (config) setCesLimits(config.limits);
     }
   }, [selectedConfig, savedConfigs]);
 
   const delayInSeconds = delayUnit === 'min' ? delay * 60 : delay;
 
-  // Calculate migration time and rates
   const { migrationTime, effectiveRates, upperLimits, hasWarnings } = useMemo(() => {
-    const rates = {};
-    const limits = {};
-    const entityWarnings = [];
-
-    ENTITY_TYPES.forEach(entity => {
-      const tpm = cesLimits[entity] || 0;
-      const upperLimit = calculateUpperLimit(tpm, maxWrites);
-      limits[entity] = upperLimit;
-
-      const grossDuration = calculateGrossDuration(
-        batchSize,
-        concurrency,
-        durations[entity] || 0,
-        delayInSeconds
-      );
-      const effectiveRate = calculateEffectiveRate(batchSize, grossDuration);
-      rates[entity] = effectiveRate;
-
-      if (needsWarning(effectiveRate, upperLimit)) {
-        entityWarnings.push(`${entity}: Effective rate (${Math.round(effectiveRate)}/min) exceeds 80% of CES limit (${upperLimit}/min). Consider reducing batch size or concurrency.`);
-      }
+    const result = estimateMigrationTime({
+      batchSize,
+      concurrency,
+      delayInSeconds,
+      cesLimits,
+      durations,
+      totals,
+      maxWritesByEntity: maxWrites,
+      bufferTime,
     });
-
-    // Calculate total migration time
-    let totalMinutes = 0;
-    ENTITY_TYPES.forEach(entity => {
-      const count = totals[entity] || 0;
-      const rate = rates[entity] || 1;
-      if (count > 0 && rate > 0) {
-        totalMinutes += count / rate;
-      }
-    });
-
-    // Apply buffer
-    const bufferMultiplier = 1 + (bufferTime / 100);
-    totalMinutes *= bufferMultiplier;
-
     return {
-      migrationTime: formatMigrationTime(totalMinutes),
-      effectiveRates: rates,
-      upperLimits: limits,
-      hasWarnings: entityWarnings.length > 0,
-      warnings: entityWarnings,
+      migrationTime: result.migrationTime,
+      effectiveRates: result.effectiveRates,
+      upperLimits: result.upperLimits,
+      hasWarnings: Object.values(result.hasWarnings).some(Boolean),
     };
   }, [batchSize, concurrency, delayInSeconds, cesLimits, durations, totals, maxWrites, bufferTime]);
 
   const handleSaveConfig = () => {
     if (!newConfigName.trim()) return;
-    const config = {
-      name: newConfigName.trim(),
-      limits: { ...cesLimits },
-    };
+    const config = { name: newConfigName.trim(), limits: { ...cesLimits } };
     const updated = addCESLimitToCookie(config);
     setSavedConfigs(updated);
     setSelectedConfig(config.name);
     setNewConfigName('');
-    setWarningSnackbar({ open: true, message: `Saved "${config.name}"` });
+    setSnackbar({ open: true, message: `Saved "${config.name}"` });
+  };
+
+  const handleUpdateConfig = () => {
+    if (selectedConfig === 'Default') return;
+    const config = { name: selectedConfig, limits: { ...cesLimits } };
+    const updated = addCESLimitToCookie(config);
+    setSavedConfigs(updated);
+    setSnackbar({ open: true, message: `Updated "${selectedConfig}"` });
+  };
+
+  const handleDeleteConfig = () => {
+    if (selectedConfig === 'Default') return;
+    const updated = deleteCESLimitFromCookie(selectedConfig);
+    setSavedConfigs(updated);
+    setSelectedConfig(updated.length > 0 ? updated[0].name : 'Default');
+    if (updated.length > 0) setCesLimits(updated[0].limits);
+    else setCesLimits(DEFAULT_TPM);
+    setSnackbar({ open: true, message: `Deleted "${selectedConfig}"` });
   };
 
   const handleTPMChange = (entity, value) => {
     const num = parseInt(value, 10);
-    if (!isNaN(num) && num >= 0) {
-      setCesLimits(prev => ({ ...prev, [entity]: num }));
-    } else if (value === '') {
-      setCesLimits(prev => ({ ...prev, [entity]: 0 }));
-    }
+    if (!isNaN(num) && num >= 0) setCesLimits(prev => ({ ...prev, [entity]: num }));
+    else if (value === '') setCesLimits(prev => ({ ...prev, [entity]: 0 }));
   };
 
   const handleDurationChange = (entity, value) => {
     const num = parseInt(value, 10);
-    if (!isNaN(num) && num >= 0) {
-      setDurations(prev => ({ ...prev, [entity]: num }));
-    } else if (value === '') {
-      setDurations(prev => ({ ...prev, [entity]: 0 }));
-    }
+    if (!isNaN(num) && num >= 0) setDurations(prev => ({ ...prev, [entity]: num }));
+    else if (value === '') setDurations(prev => ({ ...prev, [entity]: 0 }));
   };
 
   const handleTotalChange = (entity, value) => {
+    const num = parseFormattedNumber(value);
+    setTotals(prev => ({ ...prev, [entity]: num }));
+  };
+
+  const handleMaxWritesChange = (entity, value) => {
     const num = parseInt(value, 10);
-    if (!isNaN(num) && num >= 0) {
-      setTotals(prev => ({ ...prev, [entity]: num }));
-    } else if (value === '') {
-      setTotals(prev => ({ ...prev, [entity]: 0 }));
-    }
+    if (!isNaN(num) && num >= 1) setMaxWrites(prev => ({ ...prev, [entity]: num }));
+    else if (value === '') setMaxWrites(prev => ({ ...prev, [entity]: 1 }));
   };
 
   const handleBufferChange = (value) => {
-    if (value === '') {
-      setBufferTime(0);
-    } else {
-      const num = parseInt(value, 10);
-      if (!isNaN(num) && num >= 0) setBufferTime(num);
-    }
+    const num = parseInt(value, 10);
+    if (value === '') setBufferTime(0);
+    else if (!isNaN(num) && num >= 0) setBufferTime(num);
   };
 
-  const handleMaxWritesChange = (value) => {
-    if (value === '') {
-      setMaxWrites(1);
-    } else {
-      const num = parseInt(value, 10);
-      if (!isNaN(num) && num >= 1) setMaxWrites(num);
-    }
-  };
+  const isCustomPreset = selectedConfig !== 'Default' && savedConfigs.some(c => c.name === selectedConfig);
 
   return (
     <Box
@@ -204,207 +184,12 @@ function App() {
         px: 2,
       }}
     >
-      <Typography
-        variant="h4"
-        component="h1"
-        sx={{
-          color: 'white',
-          textAlign: 'center',
-          mb: 4,
-          fontWeight: 700,
-          letterSpacing: 1,
-        }}
-      >
+      <Typography variant="h4" component="h1" sx={{ color: 'white', textAlign: 'center', mb: 4, fontWeight: 700, letterSpacing: 1 }}>
         Migration Estimator
       </Typography>
 
       <Grid container spacing={3} sx={{ maxWidth: 1200, margin: '0 auto' }}>
-        {/* Component 1: Sliders */}
-        <Grid item xs={12} md={8}>
-          <Paper sx={{ p: 3, backgroundColor: 'rgba(255,255,255,0.95)' }}>
-            <Typography variant="h6" gutterBottom>
-              Configuration
-            </Typography>
-            <Box sx={{ mb: 2 }}>
-              <Typography gutterBottom>Batch Size: {batchSize}</Typography>
-              <Slider
-                value={batchSize}
-                onChange={(_, v) => setBatchSize(v)}
-                min={1}
-                max={500}
-                valueLabelDisplay="auto"
-                color="primary"
-              />
-            </Box>
-            <Box sx={{ mb: 2 }}>
-              <Typography gutterBottom>Concurrency: {concurrency}</Typography>
-              <Slider
-                value={concurrency}
-                onChange={(_, v) => setConcurrency(v)}
-                min={1}
-                max={200}
-                valueLabelDisplay="auto"
-                color="primary"
-              />
-            </Box>
-            <Box>
-              <Typography gutterBottom>
-                Delay: {delay} {delayUnit}
-              </Typography>
-              <Slider
-                value={delay}
-                onChange={(_, v) => setDelay(v)}
-                min={0}
-                max={delayUnit === 'sec' ? 300 : 10}
-                valueLabelDisplay="auto"
-                color="primary"
-              />
-              <FormControl component="fieldset" sx={{ mt: 1 }}>
-                <RadioGroup
-                  row
-                  value={delayUnit}
-                  onChange={(e) => setDelayUnit(e.target.value)}
-                >
-                  <FormControlLabel value="sec" control={<Radio size="small" />} label="Seconds" />
-                  <FormControlLabel value="min" control={<Radio size="small" />} label="Minutes" />
-                </RadioGroup>
-              </FormControl>
-            </Box>
-          </Paper>
-        </Grid>
-
-        {/* Component 2: CES Write Limits */}
-        <Grid item xs={12} md={4}>
-          <Paper sx={{ p: 2, backgroundColor: 'rgba(255,255,255,0.95)' }}>
-            <Typography variant="h6" gutterBottom>
-              CES Write Limits
-            </Typography>
-            <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 2 }}>
-              These values are for CES DB instance 4x.large
-            </Typography>
-
-            <FormControl fullWidth size="small" sx={{ mb: 2 }}>
-              <InputLabel>Preset</InputLabel>
-              <Select
-                value={selectedConfig || 'Default'}
-                label="Preset"
-                onChange={(e) => setSelectedConfig(e.target.value)}
-              >
-                <MenuItem value="Default">Default</MenuItem>
-                {savedConfigs.map(c => (
-                  <MenuItem key={c.name} value={c.name}>{c.name}</MenuItem>
-                ))}
-              </Select>
-            </FormControl>
-
-            <TableContainer>
-              <Table size="small">
-                <TableHead>
-                  <TableRow>
-                    <TableCell>Entity</TableCell>
-                    <TableCell align="right">TPM</TableCell>
-                  </TableRow>
-                </TableHead>
-                <TableBody>
-                  {ENTITY_TYPES.map(entity => (
-                    <TableRow key={entity}>
-                      <TableCell>{entity}</TableCell>
-                      <TableCell align="right">
-                        <TextField
-                          type="number"
-                          size="small"
-                          value={cesLimits[entity] ?? ''}
-                          onChange={(e) => handleTPMChange(entity, e.target.value)}
-                          inputProps={{ min: 0, step: 1 }}
-                          sx={{ width: 80 }}
-                        />
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </TableContainer>
-
-            <Box sx={{ mt: 2, display: 'flex', gap: 1, flexWrap: 'wrap' }}>
-              <TextField
-                size="small"
-                placeholder="Config name"
-                value={newConfigName}
-                onChange={(e) => setNewConfigName(e.target.value)}
-                sx={{ flex: 1, minWidth: 100 }}
-              />
-              <Button variant="contained" onClick={handleSaveConfig} size="small">
-                Save
-              </Button>
-            </Box>
-          </Paper>
-        </Grid>
-
-        {/* Component 3 & Elements: Durations, Totals, Buffer, Max Writes */}
-        <Grid item xs={12}>
-          <Paper sx={{ p: 3, backgroundColor: 'rgba(255,255,255,0.95)' }}>
-            <Typography variant="h6" gutterBottom>
-              Entity Configuration
-            </Typography>
-            <Grid container spacing={3}>
-              {ENTITY_TYPES.map(entity => (
-                <Grid item xs={12} sm={4} key={entity}>
-                  <Card variant="outlined">
-                    <CardContent>
-                      <Typography variant="subtitle2" color="primary">
-                        {entity}
-                      </Typography>
-                      <TextField
-                        fullWidth
-                        size="small"
-                        label="Duration (sec)"
-                        type="number"
-                        value={durations[entity] ?? ''}
-                        onChange={(e) => handleDurationChange(entity, e.target.value)}
-                        inputProps={{ min: 0 }}
-                        sx={{ mt: 1 }}
-                      />
-                      <TextField
-                        fullWidth
-                        size="small"
-                        label="Total count"
-                        type="number"
-                        value={totals[entity] ?? ''}
-                        onChange={(e) => handleTotalChange(entity, e.target.value)}
-                        inputProps={{ min: 0 }}
-                        sx={{ mt: 1 }}
-                      />
-                    </CardContent>
-                  </Card>
-                </Grid>
-              ))}
-              <Grid item xs={12} sm={6} md={3}>
-                <TextField
-                  fullWidth
-                  size="small"
-                  label="Buffer time (%)"
-                  type="number"
-                  value={bufferTime}
-                  onChange={(e) => handleBufferChange(e.target.value)}
-                  inputProps={{ min: 0, step: 1 }}
-                />
-              </Grid>
-              <Grid item xs={12} sm={6} md={3}>
-                <TextField
-                  fullWidth
-                  size="small"
-                  label="Max writes per entity"
-                  type="number"
-                  value={maxWrites}
-                  onChange={(e) => handleMaxWritesChange(e.target.value)}
-                  inputProps={{ min: 1, step: 1 }}
-                />
-              </Grid>
-            </Grid>
-          </Paper>
-        </Grid>
-
-        {/* Component 4: Migration Time Display */}
+        {/* Component 4: Migration Time Display - AT TOP */}
         <Grid item xs={12}>
           <Paper
             sx={{
@@ -418,17 +203,7 @@ function App() {
             <Typography variant="overline" color="text.secondary">
               Estimated Migration Time
             </Typography>
-            <Typography
-              variant="h2"
-              component="div"
-              sx={{
-                fontWeight: 700,
-                color: 'primary.main',
-                fontFamily: 'monospace',
-                letterSpacing: 4,
-                mt: 1,
-              }}
-            >
+            <Typography variant="h2" component="div" sx={{ fontWeight: 700, color: 'primary.main', fontFamily: 'monospace', letterSpacing: 4, mt: 1 }}>
               {migrationTime}
             </Typography>
             {hasWarnings && (
@@ -452,14 +227,188 @@ function App() {
             )}
           </Paper>
         </Grid>
+
+        {/* Component 1: Sliders + Component 2: CES Write Limits - Symmetric side by side */}
+        <Grid item xs={12} md={6}>
+          <Paper sx={{ p: 3, backgroundColor: 'rgba(255,255,255,0.95)', height: '100%' }}>
+            <Typography variant="h6" gutterBottom>Configuration</Typography>
+            <Box sx={{ mb: 2 }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 0.5 }}>
+                <Typography flex={1}>Batch Size</Typography>
+                <TextField
+                  size="small"
+                  type="number"
+                  value={batchSize}
+                  onChange={(e) => { const v = parseInt(e.target.value, 10); if (!isNaN(v) && v >= 1 && v <= 1000) setBatchSize(v); }}
+                  inputProps={{ min: 1, max: 1000 }}
+                  sx={{ width: 80 }}
+                />
+              </Box>
+              <Slider value={batchSize} onChange={(_, v) => setBatchSize(v)} min={1} max={1000} valueLabelDisplay="auto" />
+            </Box>
+            <Box sx={{ mb: 2 }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 0.5 }}>
+                <Typography flex={1}>Concurrency</Typography>
+                <TextField
+                  size="small"
+                  type="number"
+                  value={concurrency}
+                  onChange={(e) => { const v = parseInt(e.target.value, 10); if (!isNaN(v) && v >= 1 && v <= 500) setConcurrency(v); }}
+                  inputProps={{ min: 1, max: 500 }}
+                  sx={{ width: 80 }}
+                />
+              </Box>
+              <Slider value={concurrency} onChange={(_, v) => setConcurrency(v)} min={1} max={500} valueLabelDisplay="auto" />
+            </Box>
+            <Box>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 0.5 }}>
+                <Typography flex={1}>Delay</Typography>
+                <TextField
+                  size="small"
+                  type="number"
+                  value={delay}
+                  onChange={(e) => {
+                    const v = parseInt(e.target.value, 10);
+                    const max = delayUnit === 'sec' ? 600 : 30;
+                    if (!isNaN(v) && v >= 0 && v <= max) setDelay(v);
+                  }}
+                  inputProps={{ min: 0, max: delayUnit === 'sec' ? 600 : 30 }}
+                  sx={{ width: 80 }}
+                />
+                <Typography variant="body2">{delayUnit}</Typography>
+              </Box>
+              <Slider
+                value={delay}
+                onChange={(_, v) => setDelay(v)}
+                min={0}
+                max={delayUnit === 'sec' ? 600 : 30}
+                valueLabelDisplay="auto"
+              />
+              <RadioGroup row value={delayUnit} onChange={(e) => setDelayUnit(e.target.value)} sx={{ mt: 1 }}>
+                <FormControlLabel value="sec" control={<Radio size="small" />} label="Seconds" />
+                <FormControlLabel value="min" control={<Radio size="small" />} label="Minutes" />
+              </RadioGroup>
+            </Box>
+          </Paper>
+        </Grid>
+
+        <Grid item xs={12} md={6}>
+          <Paper sx={{ p: 3, backgroundColor: 'rgba(255,255,255,0.95)', height: '100%' }}>
+            <Typography variant="h6" gutterBottom>CES Write Limits</Typography>
+            {selectedConfig === 'Default' && (
+              <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 2 }}>
+                These values are for CES DB instance 4x.large
+              </Typography>
+            )}
+            <FormControl fullWidth size="small" sx={{ mb: 2 }}>
+              <InputLabel>Preset</InputLabel>
+              <Select value={selectedConfig || 'Default'} label="Preset" onChange={(e) => setSelectedConfig(e.target.value)}>
+                <MenuItem value="Default">Default</MenuItem>
+                {savedConfigs.map(c => <MenuItem key={c.name} value={c.name}>{c.name}</MenuItem>)}
+              </Select>
+            </FormControl>
+            <TableContainer>
+              <Table size="small">
+                <TableHead><TableRow><TableCell>Entity</TableCell><TableCell align="right">TPM</TableCell></TableRow></TableHead>
+                <TableBody>
+                  {ENTITY_TYPES.map(entity => (
+                    <TableRow key={entity}>
+                      <TableCell>{entity}</TableCell>
+                      <TableCell align="right">
+                        <TextField
+                          type="number"
+                          size="small"
+                          value={cesLimits[entity] ?? ''}
+                          onChange={(e) => handleTPMChange(entity, e.target.value)}
+                          inputProps={{ min: 0 }}
+                          sx={{ width: 100 }}
+                        />
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </TableContainer>
+            <Box sx={{ mt: 2, display: 'flex', gap: 1, flexWrap: 'wrap', alignItems: 'center' }}>
+              <TextField
+                size="small"
+                placeholder="Preset name"
+                value={newConfigName}
+                onChange={(e) => setNewConfigName(e.target.value)}
+                sx={{ flex: 1, minWidth: 100 }}
+              />
+              <ButtonGroup size="small">
+                <Button startIcon={<SaveIcon />} variant="contained" onClick={handleSaveConfig}>Save New</Button>
+                {isCustomPreset && (
+                  <>
+                    <Button variant="outlined" onClick={handleUpdateConfig}>Update</Button>
+                    <IconButton color="error" onClick={handleDeleteConfig} size="small" title="Delete preset">
+                      <DeleteIcon />
+                    </IconButton>
+                  </>
+                )}
+              </ButtonGroup>
+            </Box>
+          </Paper>
+        </Grid>
+
+        {/* Component 3: Entity Configuration - Symmetric 3-column cards */}
+        <Grid item xs={12}>
+          <Paper sx={{ p: 3, backgroundColor: 'rgba(255,255,255,0.95)' }}>
+            <Typography variant="h6" gutterBottom>Entity Configuration</Typography>
+            <Grid container spacing={3}>
+              {ENTITY_TYPES.map(entity => (
+                <Grid item xs={12} sm={4} key={entity}>
+                  <Card variant="outlined" sx={{ height: '100%' }}>
+                    <CardContent>
+                      <Typography variant="subtitle2" color="primary">{entity}</Typography>
+                      <TextField
+                        fullWidth size="small" label="Duration (sec)" type="number"
+                        value={durations[entity] ?? ''}
+                        onChange={(e) => handleDurationChange(entity, e.target.value)}
+                        inputProps={{ min: 0 }}
+                        sx={{ mt: 1 }}
+                      />
+                      <TextField
+                        fullWidth size="small" label="Total count"
+                        value={formatWithCommas(totals[entity] ?? 0)}
+                        onChange={(e) => handleTotalChange(entity, e.target.value)}
+                        placeholder="0"
+                        inputProps={{ inputMode: 'numeric' }}
+                        sx={{ mt: 1 }}
+                      />
+                      <TextField
+                        fullWidth size="small" label="Max writes"
+                        type="number"
+                        value={maxWrites[entity] ?? ''}
+                        onChange={(e) => handleMaxWritesChange(entity, e.target.value)}
+                        inputProps={{ min: 1 }}
+                        sx={{ mt: 1 }}
+                      />
+                    </CardContent>
+                  </Card>
+                </Grid>
+              ))}
+              <Grid item xs={12} sm={4}>
+                <Card variant="outlined" sx={{ height: '100%' }}>
+                  <CardContent>
+                    <Typography variant="subtitle2" color="primary">Buffer</Typography>
+                    <TextField
+                      fullWidth size="small" label="Buffer time (%)" type="number"
+                      value={bufferTime}
+                      onChange={(e) => handleBufferChange(e.target.value)}
+                      inputProps={{ min: 0 }}
+                      sx={{ mt: 1 }}
+                    />
+                  </CardContent>
+                </Card>
+              </Grid>
+            </Grid>
+          </Paper>
+        </Grid>
       </Grid>
 
-      <Snackbar
-        open={warningSnackbar.open}
-        autoHideDuration={3000}
-        onClose={() => setWarningSnackbar({ ...warningSnackbar, open: false })}
-        message={warningSnackbar.message}
-      />
+      <Snackbar open={snackbar.open} autoHideDuration={3000} onClose={() => setSnackbar({ ...snackbar, open: false })} message={snackbar.message} />
     </Box>
   );
 }
