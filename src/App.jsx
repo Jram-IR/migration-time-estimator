@@ -211,21 +211,17 @@ function App() {
       </Typography>
 
       <Grid container spacing={gridSpacing} sx={{ maxWidth: 1200, margin: '0 auto', width: '100%' }}>
-        {/* Warnings - stacked above Migration Time */}
-        {hasWarnings && (
-          <Grid item xs={12} container direction="column" spacing={1}>
-            {ENTITY_TYPES.filter(entity => needsWarning(effectiveRates[entity] || 0, upperLimits[entity] || 0)).map(entity => (
-              <Grid item key={entity}>
-                <Alert severity="warning" sx={{ py: 0.5 }}>
+        {/* Row 1: Warnings + Migration Time */}
+        <Grid item xs={12}>
+          {hasWarnings && (
+            <Box sx={{ display: 'flex', flexDirection: 'column', gap: '1px', mb: '1px' }}>
+              {ENTITY_TYPES.filter(entity => needsWarning(effectiveRates[entity] || 0, upperLimits[entity] || 0)).map(entity => (
+                <Alert key={entity} severity="warning" sx={{ py: 0.5 }}>
                   {entity}: Effective rate ({Math.round(effectiveRates[entity])}/min) exceeds 80% of limit ({upperLimits[entity]}/min)
                 </Alert>
-              </Grid>
-            ))}
-          </Grid>
-        )}
-
-        {/* Row 1: Migration Time only */}
-        <Grid item xs={12}>
+              ))}
+            </Box>
+          )}
           <Paper sx={{ p: { xs: 2, sm: 4 }, textAlign: 'center', backgroundColor: hasWarnings ? 'rgba(255, 193, 7, 0.2)' : 'rgba(76, 175, 80, 0.2)', border: 2, borderColor: hasWarnings ? 'warning.main' : 'primary.main' }}>
             <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 1 }}>
               <Box sx={{ flex: 1, minWidth: 0 }}>
