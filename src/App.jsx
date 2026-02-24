@@ -202,45 +202,88 @@ function App() {
 
   const isCustomPreset = selectedConfig !== 'Default' && savedConfigs.some(c => c.name === selectedConfig);
 
-  const gridSpacing = { xs: 2, sm: 3 };
-
   return (
     <Box sx={{ minHeight: '100vh', background: 'linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%)', py: { xs: 2, sm: 4 }, px: { xs: 1.5, sm: 2 } }}>
       <Typography variant="h4" component="h1" sx={{ color: 'white', textAlign: 'center', mb: { xs: 3, sm: 4 }, fontWeight: 700, letterSpacing: 1, fontSize: { xs: '1.5rem', sm: '2rem' } }}>
         Migration Estimator
       </Typography>
 
-      <Grid container spacing={gridSpacing} sx={{ maxWidth: 1200, margin: '0 auto', width: '100%' }}>
-        {/* Row 1: Warnings + Migration Time */}
-        <Grid item xs={12}>
-          {hasWarnings && (
-            <Box sx={{ display: 'flex', flexDirection: 'column', gap: '1px', mb: '1px' }}>
-              {ENTITY_TYPES.filter(entity => needsWarning(effectiveRates[entity] || 0, upperLimits[entity] || 0)).map(entity => (
-                <Alert key={entity} severity="warning" sx={{ py: 0.5 }}>
-                  {entity}: Effective rate ({Math.round(effectiveRates[entity])}/min) exceeds 80% of limit ({upperLimits[entity]}/min)
-                </Alert>
-              ))}
+      <Box sx={{ maxWidth: 1200, margin: '0 auto', width: '100%' }}>
+        {/* Small screen: stacked. Large screen: 3 columns (Col1: Migration+Entity | Col2: Config | Col3: CES) */}
+        <Box
+          sx={{
+            display: 'flex',
+            flexDirection: 'column',
+            gap: 3,
+            '@media (min-width: 960px)': {
+              flexDirection: 'row',
+              alignItems: 'flex-start',
+            },
+          }}
+        >
+          {/* Column 1 (large screen) or Rows 1+3 (small screen): Migration Time + Entity Config */}
+          <Box
+            sx={{
+              display: 'flex',
+              flexDirection: 'column',
+              gap: 3,
+              flex: 1,
+              minWidth: 0,
+              '@media (min-width: 960px)': {
+                flex: '0 0 400px',
+                minWidth: 400,
+                maxWidth: 400,
+              },
+            }}
+          >
+            {/* Warnings + Migration Time */}
+            <Box sx={{ width: '100%' }}>
+              {hasWarnings && (
+                <Box sx={{ display: 'flex', flexDirection: 'column', gap: '1px', mb: '1px' }}>
+                  {ENTITY_TYPES.filter(entity => needsWarning(effectiveRates[entity] || 0, upperLimits[entity] || 0)).map(entity => (
+                    <Alert key={entity} severity="warning" sx={{ py: 0.5 }}>
+                      {entity}: Effective rate ({Math.round(effectiveRates[entity])}/min) exceeds 80% of limit ({upperLimits[entity]}/min)
+                    </Alert>
+                  ))}
+                </Box>
+              )}
+              <Paper sx={{ width: '100%', p: { xs: 2, sm: 4 }, textAlign: 'center', backgroundColor: hasWarnings ? 'rgba(255, 193, 7, 0.2)' : 'rgba(76, 175, 80, 0.2)', border: 2, borderColor: hasWarnings ? 'warning.main' : 'primary.main', boxSizing: 'border-box' }}>
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 1 }}>
+                  <Box sx={{ flex: 1, minWidth: 0 }}>
+                    <Typography variant="overline" color="text.secondary">Estimated Migration Time</Typography>
+                    <Typography variant="h2" component="div" sx={{ fontWeight: 700, color: 'primary.main', fontFamily: 'monospace', letterSpacing: { xs: 1, sm: 4 }, mt: 1, fontSize: { xs: '2rem', sm: '3rem' } }}>
+                      {migrationTime}
+                    </Typography>
+                  </Box>
+                  <Button variant="outlined" onClick={handleDownloadReport} size="small">
+                    ⬇ Download Report
+                  </Button>
+                </Box>
+              </Paper>
             </Box>
-          )}
-          <Paper sx={{ p: { xs: 2, sm: 4 }, textAlign: 'center', backgroundColor: hasWarnings ? 'rgba(255, 193, 7, 0.2)' : 'rgba(76, 175, 80, 0.2)', border: 2, borderColor: hasWarnings ? 'warning.main' : 'primary.main' }}>
-            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 1 }}>
-              <Box sx={{ flex: 1, minWidth: 0 }}>
-                <Typography variant="overline" color="text.secondary">Estimated Migration Time</Typography>
-                <Typography variant="h2" component="div" sx={{ fontWeight: 700, color: 'primary.main', fontFamily: 'monospace', letterSpacing: { xs: 1, sm: 4 }, mt: 1, fontSize: { xs: '2rem', sm: '3rem' } }}>
-                  {migrationTime}
-                </Typography>
-              </Box>
-              <Button variant="outlined" onClick={handleDownloadReport} size="small">
-                ⬇ Download Report
-              </Button>
-            </Box>
-          </Paper>
-        </Grid>
 
-        {/* Row 2: Configuration | CES Write Limits - Side by side */}
-        <Grid item xs={12}>
-          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3, '@media (min-width: 500px)': { flexDirection: 'row' } }}>
+            {/* Entity Configuration - on small screen same width as Config+CES via flex */}
+            <Paper sx={{ width: '100%', p: '15px', backgroundColor: 'rgba(255,255,255,0.95)', boxSizing: 'border-box', '@media (min-width: 960px)': { minWidth: 400, maxWidth: 400 } }}>
+              <Typography variant="h6" gutterBottom>Entity Configuration</Typography>
+              <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
+                {ENTITY_TYPES.map(entity => (
+                  <Card key={entity} variant="outlined" sx={{ flex: '0 0 200px', minWidth: 200, maxWidth: 200 }}>
+                    <CardContent>
+                      <Typography variant="subtitle2" color="primary">{entity}</Typography>
+                      <TextField fullWidth size="small" label="Duration (sec)" type="text" inputMode="numeric" value={durations[entity] ?? ''} onChange={(e) => handleDurationChange(entity, e.target.value)} sx={{ mt: 1 }} />
+                      <TextField fullWidth size="small" label="Total count" value={formatWithCommas(totals[entity] ?? 0)} onChange={(e) => handleTotalChange(entity, e.target.value)} placeholder="0" inputProps={{ inputMode: 'numeric' }} sx={{ mt: 1 }} />
+                      <TextField fullWidth size="small" label="Max writes" type="text" inputMode="numeric" value={maxWrites[entity] ?? ''} onChange={(e) => handleMaxWritesChange(entity, e.target.value)} sx={{ mt: 1 }} />
+                    </CardContent>
+                  </Card>
+                ))}
+              </Box>
+            </Paper>
+          </Box>
+
+          {/* Column 2 & 3 (large screen) or Row 2 (small screen): Configuration | CES Write Limits */}
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3, '@media (min-width: 500px)': { flexDirection: 'row' }, '@media (min-width: 960px)': { flex: 1, minWidth: 0 } }}>
             <Paper sx={{ flex: 1, minWidth: 280, p: { xs: 2, sm: 3 }, backgroundColor: 'rgba(255,255,255,0.95)', minHeight: 320 }}>
+              <Typography variant="h6" gutterBottom>Configuration</Typography>
               <Typography variant="h6" gutterBottom>Configuration</Typography>
             <Box sx={{ mb: 2 }}>
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 0.5 }}>
@@ -327,27 +370,8 @@ function App() {
             </Box>
             </Paper>
           </Box>
-        </Grid>
-
-        {/* Row 3: Entity Configuration - 3 columns side by side */}
-        <Grid item xs={12}>
-          <Paper sx={{ p: '15px', backgroundColor: 'rgba(255,255,255,0.95)', width: 'fit-content', maxWidth: '100%', boxSizing: 'border-box' }}>
-            <Typography variant="h6" gutterBottom>Entity Configuration</Typography>
-            <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
-              {ENTITY_TYPES.map(entity => (
-                <Card key={entity} variant="outlined" sx={{ flex: '0 0 200px', minWidth: 200, maxWidth: 200 }}>
-                  <CardContent>
-                      <Typography variant="subtitle2" color="primary">{entity}</Typography>
-                      <TextField fullWidth size="small" label="Duration (sec)" type="text" inputMode="numeric" value={durations[entity] ?? ''} onChange={(e) => handleDurationChange(entity, e.target.value)} sx={{ mt: 1 }} />
-                      <TextField fullWidth size="small" label="Total count" value={formatWithCommas(totals[entity] ?? 0)} onChange={(e) => handleTotalChange(entity, e.target.value)} placeholder="0" inputProps={{ inputMode: 'numeric' }} sx={{ mt: 1 }} />
-                      <TextField fullWidth size="small" label="Max writes" type="text" inputMode="numeric" value={maxWrites[entity] ?? ''} onChange={(e) => handleMaxWritesChange(entity, e.target.value)} sx={{ mt: 1 }} />
-                  </CardContent>
-                </Card>
-              ))}
-            </Box>
-          </Paper>
-        </Grid>
-      </Grid>
+        </Box>
+      </Box>
 
       <Snackbar open={snackbar.open} autoHideDuration={3000} onClose={() => setSnackbar(prev => ({ ...prev, open: false }))} message={snackbar.message} />
     </Box>
