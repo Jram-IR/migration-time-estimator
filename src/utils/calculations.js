@@ -15,11 +15,12 @@ function log(...args) {
  * TPS = TPM/60, entities/sec = floor(TPS/MaxWrites), entities/min = entities/sec * 60
  */
 export function calculateUpperLimit(tpm, maxWrites) {
-  const tps = tpm / 60;
-  const entitiesPerSec = Math.floor(tps / maxWrites);
+  const safeMaxWrites = Math.max(1, Number(maxWrites) || 1);
+  const tps = (Number(tpm) || 0) / 60;
+  const entitiesPerSec = Math.floor(tps / safeMaxWrites);
   const upperLimit = entitiesPerSec * 60;
   if (DEBUG) {
-    log(`  [calculateUpperLimit] TPM=${tpm}, MaxWrites=${maxWrites} => TPS=${tps.toFixed(2)}, entities/sec=${entitiesPerSec}, upperLimit=${upperLimit}/min`);
+    log(`  [calculateUpperLimit] TPM=${tpm}, MaxWrites=${safeMaxWrites} => TPS=${tps.toFixed(2)}, entities/sec=${entitiesPerSec}, upperLimit=${upperLimit}/min`);
   }
   return upperLimit;
 }
@@ -105,16 +106,16 @@ export function formatMigrationTime(totalMinutes) {
 /**
  * Full migration time estimation with comprehensive debug logging
  */
-export function estimateMigrationTime(params) {
+export function estimateMigrationTime(params = {}) {
   const {
-    batchSize,
-    concurrency,
-    delayInSeconds,
-    cesLimits,
-    durations,
-    totals,
-    maxWritesByEntity,
-    bufferTime,
+    batchSize = 100,
+    concurrency = 50,
+    delayInSeconds = 30,
+    cesLimits = {},
+    durations = {},
+    totals = {},
+    maxWritesByEntity = {},
+    bufferTime = 0,
   } = params;
 
   log('\n' + '='.repeat(80));

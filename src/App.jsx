@@ -27,8 +27,6 @@ import {
   CardContent,
   IconButton,
 } from '@mui/material';
-import DeleteIcon from '@mui/icons-material/Delete';
-import SaveIcon from '@mui/icons-material/Save';
 import {
   needsWarning,
   estimateMigrationTime,
@@ -43,8 +41,9 @@ const DEFAULT_TOTALS = { Company: 0, Site: 0, Contact: 0 };
 const DEFAULT_MAX_WRITES = { Company: 16, Site: 16, Contact: 16 };
 
 function formatWithCommas(num) {
-  if (num === 0) return '0';
-  return num.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+  const n = Number(num);
+  if (n === 0 || isNaN(n)) return '0';
+  return Math.floor(n).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ',');
 }
 
 function parseFormattedNumber(str) {
@@ -76,12 +75,16 @@ function App() {
   const [snackbar, setSnackbar] = useState({ open: false, message: '' });
 
   useEffect(() => {
-    const saved = getCESLimitsFromCookie();
-    if (saved && saved.length > 0) {
-      setSavedConfigs(saved);
-      setSelectedConfig(saved[0].name);
-      setCesLimits(saved[0].limits);
-    } else {
+    try {
+      const saved = getCESLimitsFromCookie();
+      if (Array.isArray(saved) && saved.length > 0 && saved[0]?.name && saved[0]?.limits) {
+        setSavedConfigs(saved);
+        setSelectedConfig(saved[0].name);
+        setCesLimits(saved[0].limits);
+      } else {
+        setSelectedConfig('Default');
+      }
+    } catch (e) {
       setSelectedConfig('Default');
     }
   }, []);
@@ -97,23 +100,36 @@ function App() {
 
   const delayInSeconds = delayUnit === 'min' ? delay * 60 : delay;
 
+  const validPresetNames = ['Default', ...savedConfigs.map(c => c.name)];
+  const safeSelectedConfig = validPresetNames.includes(selectedConfig) ? selectedConfig : 'Default';
+
   const { migrationTime, effectiveRates, upperLimits, hasWarnings } = useMemo(() => {
-    const result = estimateMigrationTime({
-      batchSize,
-      concurrency,
-      delayInSeconds,
-      cesLimits,
-      durations,
-      totals,
-      maxWritesByEntity: maxWrites,
-      bufferTime,
-    });
-    return {
-      migrationTime: result.migrationTime,
-      effectiveRates: result.effectiveRates,
-      upperLimits: result.upperLimits,
-      hasWarnings: Object.values(result.hasWarnings).some(Boolean),
-    };
+    try {
+      const result = estimateMigrationTime({
+        batchSize,
+        concurrency,
+        delayInSeconds,
+        cesLimits,
+        durations,
+        totals,
+        maxWritesByEntity: maxWrites,
+        bufferTime,
+      });
+      return {
+        migrationTime: result.migrationTime,
+        effectiveRates: result.effectiveRates || {},
+        upperLimits: result.upperLimits || {},
+        hasWarnings: Object.values(result.hasWarnings || {}).some(Boolean),
+      };
+    } catch (err) {
+      console.error('Migration estimation error:', err);
+      return {
+        migrationTime: '00:00:00',
+        effectiveRates: {},
+        upperLimits: {},
+        hasWarnings: false,
+      };
+    }
   }, [batchSize, concurrency, delayInSeconds, cesLimits, durations, totals, maxWrites, bufferTime]);
 
   const handleSaveConfig = () => {
@@ -302,7 +318,7 @@ function App() {
             )}
             <FormControl fullWidth size="small" sx={{ mb: 2 }}>
               <InputLabel>Preset</InputLabel>
-              <Select value={selectedConfig || 'Default'} label="Preset" onChange={(e) => setSelectedConfig(e.target.value)}>
+              <Select value={safeSelectedConfig} label="Preset" onChange={(e) => setSelectedConfig(e.target.value)}>
                 <MenuItem value="Default">Default</MenuItem>
                 {savedConfigs.map(c => <MenuItem key={c.name} value={c.name}>{c.name}</MenuItem>)}
               </Select>
@@ -338,12 +354,12 @@ function App() {
                 sx={{ flex: 1, minWidth: 100 }}
               />
               <ButtonGroup size="small">
-                <Button startIcon={<SaveIcon />} variant="contained" onClick={handleSaveConfig}>Save New</Button>
+                <Button variant="contained" onClick={handleSaveConfig}>Save New</Button>
                 {isCustomPreset && (
                   <>
                     <Button variant="outlined" onClick={handleUpdateConfig}>Update</Button>
-                    <IconButton color="error" onClick={handleDeleteConfig} size="small" title="Delete preset">
-                      <DeleteIcon />
+                    <IconButton color="error" onClick={handleDeleteConfig} size="small" title="Delete preset" aria-label="Delete preset">
+                      ✕
                     </IconButton>
                   </>
                 )}

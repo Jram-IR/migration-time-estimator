@@ -11,7 +11,8 @@ export function getCESLimitsFromCookie() {
     const cesCookie = cookies.find(c => c.trim().startsWith(`${COOKIE_NAME}=`));
     if (cesCookie) {
       const value = decodeURIComponent(cesCookie.split('=')[1].trim());
-      return JSON.parse(value);
+      const parsed = JSON.parse(value);
+      return Array.isArray(parsed) ? parsed : [];
     }
   } catch (e) {
     console.error('Error reading CES limits from cookie:', e);
