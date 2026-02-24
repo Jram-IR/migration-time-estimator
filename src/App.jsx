@@ -130,11 +130,13 @@ function App() {
 
   resultRef.current = estimationResult;
 
-  const { migrationTime, effectiveRates, upperLimits, hasWarnings } = {
+  const hasWarningsObj = estimationResult.hasWarnings || {};
+  const hasWarnings = Object.values(hasWarningsObj).some(Boolean);
+
+  const { migrationTime, effectiveRates, upperLimits } = {
     migrationTime: estimationResult.migrationTime,
     effectiveRates: estimationResult.effectiveRates || {},
     upperLimits: estimationResult.upperLimits || {},
-    hasWarnings: Object.values(estimationResult.hasWarnings || {}).some(Boolean),
   };
 
   const handleCreateConfig = () => {
@@ -201,9 +203,6 @@ function App() {
   const isCustomPreset = selectedConfig !== 'Default' && savedConfigs.some(c => c.name === selectedConfig);
 
   const gridSpacing = { xs: 2, sm: 3 };
-  const warningMessages = ENTITY_TYPES
-    .filter(entity => needsWarning(effectiveRates[entity] || 0, upperLimits[entity] || 0))
-    .map(entity => `${entity}: Effective rate (${Math.round(effectiveRates[entity])}/min) exceeds 80% of limit (${upperLimits[entity]}/min)`);
 
   return (
     <Box sx={{ minHeight: '100vh', background: 'linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%)', py: { xs: 2, sm: 4 }, px: { xs: 1.5, sm: 2 } }}>
@@ -212,10 +211,16 @@ function App() {
       </Typography>
 
       <Grid container spacing={gridSpacing} sx={{ maxWidth: 1200, margin: '0 auto', width: '100%' }}>
-        {/* Warning - one line above Migration Time */}
+        {/* Warnings - stacked above Migration Time */}
         {hasWarnings && (
-          <Grid item xs={12}>
-            <Alert severity="warning" sx={{ py: 0.5 }}>{warningMessages.join('; ')}</Alert>
+          <Grid item xs={12} container direction="column" spacing={1}>
+            {ENTITY_TYPES.filter(entity => needsWarning(effectiveRates[entity] || 0, upperLimits[entity] || 0)).map(entity => (
+              <Grid item key={entity}>
+                <Alert severity="warning" sx={{ py: 0.5 }}>
+                  {entity}: Effective rate ({Math.round(effectiveRates[entity])}/min) exceeds 80% of limit ({upperLimits[entity]}/min)
+                </Alert>
+              </Grid>
+            ))}
           </Grid>
         )}
 
