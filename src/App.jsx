@@ -201,6 +201,9 @@ function App() {
   const isCustomPreset = selectedConfig !== 'Default' && savedConfigs.some(c => c.name === selectedConfig);
 
   const gridSpacing = { xs: 2, sm: 3 };
+  const warningMessages = ENTITY_TYPES
+    .filter(entity => needsWarning(effectiveRates[entity] || 0, upperLimits[entity] || 0))
+    .map(entity => `${entity}: Effective rate (${Math.round(effectiveRates[entity])}/min) exceeds 80% of limit (${upperLimits[entity]}/min)`);
 
   return (
     <Box sx={{ minHeight: '100vh', background: 'linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%)', py: { xs: 2, sm: 4 }, px: { xs: 1.5, sm: 2 } }}>
@@ -209,57 +212,50 @@ function App() {
       </Typography>
 
       <Grid container spacing={gridSpacing} sx={{ maxWidth: 1200, margin: '0 auto', width: '100%' }}>
-        {/* Row 1: Migration Time + Buffer (nested in same Paper) */}
+        {/* Warning - one line above Migration Time */}
+        {hasWarnings && (
+          <Grid item xs={12}>
+            <Alert severity="warning" sx={{ py: 0.5 }}>{warningMessages.join('; ')}</Alert>
+          </Grid>
+        )}
+
+        {/* Row 1: Migration Time only */}
         <Grid item xs={12}>
           <Paper sx={{ p: { xs: 2, sm: 4 }, textAlign: 'center', backgroundColor: hasWarnings ? 'rgba(255, 193, 7, 0.2)' : 'rgba(76, 175, 80, 0.2)', border: 2, borderColor: hasWarnings ? 'warning.main' : 'primary.main' }}>
-            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 1 }}>
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 1 }}>
               <Box sx={{ flex: 1, minWidth: 0 }}>
                 <Typography variant="overline" color="text.secondary">Estimated Migration Time</Typography>
                 <Typography variant="h2" component="div" sx={{ fontWeight: 700, color: 'primary.main', fontFamily: 'monospace', letterSpacing: { xs: 1, sm: 4 }, mt: 1, fontSize: { xs: '2rem', sm: '3rem' } }}>
                   {migrationTime}
                 </Typography>
-                {hasWarnings && (
-                  <Alert severity="warning" sx={{ mt: 2, textAlign: 'left' }}>
-                    <Typography variant="subtitle2">CES limit warning:</Typography>
-                    <ul style={{ margin: '8px 0 0 0', paddingLeft: 20 }}>
-                      {ENTITY_TYPES.map(entity => {
-                        const rate = effectiveRates[entity] || 0;
-                        const limit = upperLimits[entity] || 0;
-                        if (needsWarning(rate, limit)) {
-                          return (
-                            <li key={entity}>
-                              {entity}: Effective rate ({Math.round(rate)}/min) exceeds 80% of limit ({limit}/min).
-                            </li>
-                          );
-                        }
-                        return null;
-                      })}
-                    </ul>
-                  </Alert>
-                )}
               </Box>
               <Button variant="outlined" onClick={handleDownloadReport} size="small">
                 ⬇ Download Report
               </Button>
             </Box>
-            <Box sx={{ mt: 3, pt: 3, borderTop: 1, borderColor: 'divider', display: 'flex', justifyContent: 'center' }}>
-              <TextField
-                size="small"
-                label="Buffer time (%)"
-                type="text"
-                inputMode="numeric"
-                value={bufferTime === 0 ? '' : String(bufferTime)}
-                onChange={(e) => handleBufferChange(e.target.value)}
-                sx={{ maxWidth: 200, width: '100%' }}
-              />
-            </Box>
           </Paper>
         </Grid>
 
-        {/* Row 2: Configuration | CES Write Limits - Side by side */}
-        <Grid item xs={12} md={6}>
-          <Paper sx={{ p: { xs: 2, sm: 3 }, backgroundColor: 'rgba(255,255,255,0.95)', height: '100%', minHeight: 320 }}>
-            <Typography variant="h6" gutterBottom>Configuration</Typography>
+        {/* Row 2: Buffer time - separate card */}
+        <Grid item xs={12}>
+          <Paper sx={{ p: 2, backgroundColor: 'rgba(255,255,255,0.95)' }}>
+            <TextField
+              size="small"
+              label="Buffer time (%)"
+              type="text"
+              inputMode="numeric"
+              value={bufferTime === 0 ? '' : String(bufferTime)}
+              onChange={(e) => handleBufferChange(e.target.value)}
+              sx={{ width: 200 }}
+            />
+          </Paper>
+        </Grid>
+
+        {/* Row 3: Configuration | CES Write Limits - Side by side (flex keeps them together) */}
+        <Grid item xs={12}>
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3, '@media (min-width: 500px)': { flexDirection: 'row' } }}>
+            <Paper sx={{ flex: 1, minWidth: 280, p: { xs: 2, sm: 3 }, backgroundColor: 'rgba(255,255,255,0.95)', minHeight: 320 }}>
+              <Typography variant="h6" gutterBottom>Configuration</Typography>
             <Box sx={{ mb: 2 }}>
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 0.5 }}>
                 <Typography flex={1}>Batch Size</Typography>
@@ -286,11 +282,8 @@ function App() {
                 <FormControlLabel value="min" control={<Radio size="small" />} label="Minutes" />
               </RadioGroup>
             </Box>
-          </Paper>
-        </Grid>
-
-        <Grid item xs={12} md={6}>
-          <Paper sx={{ p: { xs: 2, sm: 3 }, backgroundColor: 'rgba(255,255,255,0.95)', height: '100%', minHeight: 320, minWidth: 320, position: 'relative' }}>
+            </Paper>
+            <Paper sx={{ flex: 1, minWidth: 280, p: { xs: 2, sm: 3 }, backgroundColor: 'rgba(255,255,255,0.95)', minHeight: 320, position: 'relative' }}>
             <Box sx={{ position: 'absolute', top: 8, right: 8, width: 40, display: 'flex', justifyContent: 'flex-end' }}>
               {isCustomPreset ? (
                 <IconButton onClick={handleUpdateConfig} color="primary" title="Save preset" aria-label="Save preset">
@@ -335,14 +328,15 @@ function App() {
                 )}
               </Box>
             </Box>
-          </Paper>
+            </Paper>
+          </Box>
         </Grid>
 
-        {/* Row 3: Entity Configuration */}
-        <Grid item xs={12} sx={{ display: 'flex', justifyContent: 'center' }}>
-          <Paper sx={{ p: { xs: 2, sm: 3 }, backgroundColor: 'rgba(255,255,255,0.95)', width: 'fit-content', minWidth: 320 }}>
+        {/* Row 4: Entity Configuration */}
+        <Grid item xs={12}>
+          <Paper sx={{ p: '15px', backgroundColor: 'rgba(255,255,255,0.95)', width: 'fit-content', maxWidth: '100%', boxSizing: 'border-box' }}>
             <Typography variant="h6" gutterBottom>Entity Configuration</Typography>
-            <Grid container spacing={gridSpacing}>
+            <Grid container spacing={2} sx={{ margin: 0, width: '100%' }}>
               {ENTITY_TYPES.map(entity => (
                 <Grid item xs={12} sm={4} key={entity}>
                   <Card variant="outlined" sx={{ height: '100%' }}>
