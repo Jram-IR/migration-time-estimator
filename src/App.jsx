@@ -211,12 +211,15 @@ function App() {
   return (
     <Box sx={{ minHeight: '100vh', background: 'linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%)', py: { xs: 2, sm: 4 }, px: { xs: 1.5, sm: 2 } }}>
       <Typography variant="h4" component="h1" sx={{ color: 'white', textAlign: 'center', mb: { xs: 3, sm: 4 }, fontWeight: 700, letterSpacing: 1, fontSize: { xs: '1.5rem', sm: '2rem' } }}>
-        Migration Estimator
+        Migration Time Estimator
+      </Typography>
+      <Typography sx={{ color: 'white', textAlign: 'center', mb: { xs: 3, sm: 4 }, fontWeight: 100, letterSpacing: 1, fontSize: { xs: '1rem', sm: '1.5rem' } }}>
+        A simple tool to estimate migration times.
       </Typography>
 
       {/* Warnings - outside main content, on top; clickable to open modal */}
       {hasWarnings && (
-        <Box sx={{ maxWidth: '100%', margin: '0 auto', width: '100%', mb: 2, px: { xs: 0, sm: 1 } }}>
+        <Box sx={{ maxWidth: '100%', margin: '0 auto', width: '90%', mb: 2, px: { xs: 0, sm: 1 } }}>
           <Alert
             severity="warning"
             onClick={() => setWarningsModalOpen(true)}
@@ -289,13 +292,13 @@ function App() {
               '@media (min-width: 960px)': {
                 flex: '0 0 50%',
                 minWidth: 0,
-                maxWidth: '50%',
+                maxWidth: '45%',
               },
             }}
           >
             {/* Migration Time */}
             <Box sx={{ width: '100%', position: 'relative' }}>
-              <Typography variant="overline" sx={{ display: 'block', mb: 0.5, position: 'relative', color: 'white' }}>Estimated Migration Time</Typography>
+              <Typography variant="overline" sx={{ display: 'block', mb: 0.5, position: 'relative', color: 'white', fontSize: '1.2rem'}}>Estimated Migration Time:</Typography>
               <Paper sx={{ width: '100%', p: { xs: 2, sm: 4 }, pt: { xs: 4, sm: 5 }, textAlign: 'center', backgroundColor: hasWarnings ? 'rgba(255, 193, 7, 0.2)' : 'rgba(76, 175, 80, 0.2)', border: 2, borderColor: hasWarnings ? 'warning.main' : 'primary.main', boxSizing: 'border-box', position: 'relative' }}>
                 <Button
                   variant="contained"
@@ -308,7 +311,7 @@ function App() {
                     top: 0,
                     right: 0,
                     minWidth: 0,
-                    padding: 0,
+                    padding: 1,
                     backgroundColor: '#2e7d32',
                     color: 'white',
                     boxShadow: 'none',
@@ -321,7 +324,7 @@ function App() {
                   {displayMigrationTime}
                 </Typography>
                 {(displayMigrationTime === '00:00:00' && !hasInvalidMaxWrites) && (
-                  <Typography variant="caption" sx={{ display: 'block', mt: 1, color: 'text.secondary' }}>
+                  <Typography variant="caption" sx={{ display: 'block', mt: 1, color: 'white' }}>
                     Enter total counts in Entity Configuration
                   </Typography>
                 )}
@@ -346,10 +349,10 @@ function App() {
             </Paper>
           </Box>
 
-          {/* Column 2 & 3 (50% on large screen): Configuration | CES Write Limits */}
+          {/* Column 2 & 3 (45% on large screen): Configuration | CES Write Limits */}
           <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3, '@media (min-width: 500px)': { flexDirection: 'row' }, '@media (min-width: 960px)': { flex: '0 0 50%', minWidth: 0, maxWidth: '50%' } }}>
             <Paper sx={{ flex: 1, minWidth: 280, p: { xs: 2, sm: 3 }, backgroundColor: 'rgba(255,255,255,0.95)', minHeight: 320 }}>
-              <Typography variant="h6" gutterBottom>Configuration</Typography>
+              <Typography variant="h6" gutterBottom>Migration Configuration</Typography>
             <Box sx={{ mb: 2 }}>
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 0.5 }}>
                 <Typography flex={1}>Batch Size</Typography>
