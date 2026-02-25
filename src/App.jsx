@@ -42,7 +42,7 @@ const ENTITY_TYPES = ['Company', 'Site', 'Contact'];
 const DEFAULT_TPM = { Company: 5600, Site: 7300, Contact: 10000 };
 const DEFAULT_DURATIONS = { Company: 20, Site: 5, Contact: 5 };
 const DEFAULT_TOTALS = { Company: 0, Site: 0, Contact: 0 };
-const DEFAULT_MAX_WRITES = { Company: 16, Site: 16, Contact: 16 };
+const DEFAULT_MAX_WRITES = { Company: 16, Site: 4, Contact: 12 };
 
 function formatWithCommas(num) {
   const n = Number(num);
