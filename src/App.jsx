@@ -25,6 +25,10 @@ import {
   Grid,
   Card,
   CardContent,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
 } from '@mui/material';
 import {
   needsWarning,
@@ -74,6 +78,7 @@ function App() {
   const [maxWrites, setMaxWrites] = useState(DEFAULT_MAX_WRITES);
   const [bufferTime, setBufferTime] = useState(0);
   const [snackbar, setSnackbar] = useState({ open: false, message: '' });
+  const [warningsModalOpen, setWarningsModalOpen] = useState(false);
   const resultRef = useRef(null);
 
   useEffect(() => {
@@ -132,12 +137,11 @@ function App() {
 
   const hasWarningsObj = estimationResult.hasWarnings || {};
   const hasWarnings = Object.values(hasWarningsObj).some(Boolean);
-
-  const { migrationTime, effectiveRates, upperLimits } = {
-    migrationTime: estimationResult.migrationTime,
-    effectiveRates: estimationResult.effectiveRates || {},
-    upperLimits: estimationResult.upperLimits || {},
-  };
+  const effectiveRates = estimationResult.effectiveRates || {};
+  const upperLimits = estimationResult.upperLimits || {};
+  const warningEntities = ENTITY_TYPES.filter(entity => needsWarning(effectiveRates[entity] || 0, upperLimits[entity] || 0));
+  const hasInvalidMaxWrites = ENTITY_TYPES.some(e => (maxWrites[e] ?? 1) < 1);
+  const migrationTime = estimationResult.migrationTime;
 
   const handleCreateConfig = () => {
     if (!newConfigName.trim()) return;
@@ -192,7 +196,7 @@ function App() {
 
   const handleMaxWritesChange = (entity, value) => {
     const num = parseInteger(value);
-    setMaxWrites(prev => ({ ...prev, [entity]: num >= 1 ? num : 1 }));
+    setMaxWrites(prev => ({ ...prev, [entity]: num >= 0 ? num : 0 }));
   };
 
   const handleBufferChange = (value) => {
@@ -202,14 +206,92 @@ function App() {
 
   const isCustomPreset = selectedConfig !== 'Default' && savedConfigs.some(c => c.name === selectedConfig);
 
+  const displayMigrationTime = hasInvalidMaxWrites ? 'N/A' : migrationTime;
+
   return (
     <Box sx={{ minHeight: '100vh', background: 'linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%)', py: { xs: 2, sm: 4 }, px: { xs: 1.5, sm: 2 } }}>
-      <Typography variant="h4" component="h1" sx={{ color: 'white', textAlign: 'center', mb: { xs: 3, sm: 4 }, fontWeight: 700, letterSpacing: 1, fontSize: { xs: '1.5rem', sm: '2rem' } }}>
-        Migration Estimator
+      <Typography variant="h4" component="h1" sx={{ color: 'white', textAlign: 'center', mb: 1, fontWeight: 700, letterSpacing: 1, fontSize: { xs: '1.5rem', sm: '2rem' }, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 1 }}>
+        <Box component="span" sx={{ display: 'inline-flex', fontSize: { xs: '1.5rem', sm: '2rem' }, lineHeight: 1, color: 'white' }}>
+          <svg viewBox="0 0 64 64" width="1em" height="1em" style={{ display: 'block' }}>
+            <defs>
+              <linearGradient id="clockFace" x1="0%" y1="0%" x2="100%" y2="100%">
+                <stop offset="0%" stopColor="#f5f5f5" />
+                <stop offset="50%" stopColor="#e0e0e0" />
+                <stop offset="100%" stopColor="#9e9e9e" />
+              </linearGradient>
+              <linearGradient id="clockEdge" x1="0%" y1="0%" x2="0%" y2="100%">
+                <stop offset="0%" stopColor="#eeeeee" />
+                <stop offset="100%" stopColor="#212121" />
+              </linearGradient>
+              <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
+                <feDropShadow dx="2" dy="2" stdDeviation="2" floodColor="#000" floodOpacity="0.3" />
+              </filter>
+            </defs>
+            <circle cx="32" cy="32" r="28" fill="url(#clockEdge)" filter="url(#shadow)" />
+            <circle cx="32" cy="32" r="24" fill="url(#clockFace)" />
+            <circle cx="32" cy="32" r="2" fill="#212121" />
+            <line x1="32" y1="32" x2="32" y2="16" stroke="#212121" strokeWidth="2" strokeLinecap="round" />
+            <line x1="32" y1="32" x2="42" y2="36" stroke="#212121" strokeWidth="1.5" strokeLinecap="round" />
+          </svg>
+        </Box> Migration Time Estimator
+      </Typography>
+      <Typography component="p" style={{ fontStyle: 'italic' }} sx={{ color: 'white', textAlign: 'center', mb: { xs: 3, sm: 4 }, fontWeight: 300, fontSize: { xs: '0.875rem', sm: '1rem' }, fontSynthesis: 'style' }}>
+        A simple tool to estimate migration times
       </Typography>
 
-      <Box sx={{ maxWidth: 1200, margin: '0 auto', width: '100%' }}>
-        {/* Small screen: stacked. Large screen: 3 columns (Col1: Migration+Entity | Col2: Config | Col3: CES) */}
+      {/* Warnings - outside main content, on top; clickable to open modal */}
+      {hasWarnings && (
+        <Box sx={{ maxWidth: '100%', margin: '0 auto', width: '90%', mb: 2, px: { xs: 0, sm: 1 } }}>
+          <Alert
+            severity="warning"
+            onClick={() => setWarningsModalOpen(true)}
+            sx={{
+              cursor: 'pointer',
+              '&:hover': { opacity: 0.95 },
+            }}
+          >
+            {warningEntities.length} rate limit warning{warningEntities.length !== 1 ? 's' : ''} — click to view details
+          </Alert>
+        </Box>
+      )}
+
+      <Dialog
+        open={warningsModalOpen}
+        onClose={() => setWarningsModalOpen(false)}
+        PaperProps={{
+          sx: {
+            background: 'linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%)',
+            color: 'white',
+            border: '1px solid rgba(255,255,255,0.2)',
+          },
+        }}
+      >
+        <DialogTitle sx={{ color: 'white' }}>Rate Limit Warnings</DialogTitle>
+        <DialogContent sx={{ color: 'white' }}>
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
+            {warningEntities.map(entity => (
+              <Box
+                key={entity}
+                sx={{
+                  p: 1.5,
+                  backgroundColor: 'rgba(255, 193, 7, 0.2)',
+                  border: '1px solid rgba(255, 193, 7, 0.5)',
+                  borderRadius: 1,
+                  color: 'white',
+                }}
+              >
+                {entity}: Effective rate ({Math.round(effectiveRates[entity])}/min) exceeds 80% of limit ({upperLimits[entity]}/min)
+              </Box>
+            ))}
+          </Box>
+        </DialogContent>
+        <DialogActions sx={{ px: 3, pb: 2 }}>
+          <Button onClick={() => setWarningsModalOpen(false)} sx={{ color: 'white' }}>Close</Button>
+        </DialogActions>
+      </Dialog>
+
+      <Box sx={{ maxWidth: '100%', margin: '0 auto', width: '100%', px: { xs: 0, sm: 1 } }}>
+        {/* Small screen: stacked. Large screen: 50% left (Migration+Entity) | 50% right (Config + CES) */}
         <Box
           sx={{
             display: 'flex',
@@ -217,11 +299,11 @@ function App() {
             gap: 3,
             '@media (min-width: 960px)': {
               flexDirection: 'row',
-              alignItems: 'flex-start',
+              alignItems: 'stretch',
             },
           }}
         >
-          {/* Column 1 (large screen) or Rows 1+3 (small screen): Migration Time + Entity Config */}
+          {/* Column 1 (50% on large screen): Migration Time + Entity Config */}
           <Box
             sx={{
               display: 'flex',
@@ -230,48 +312,57 @@ function App() {
               flex: 1,
               minWidth: 0,
               '@media (min-width: 960px)': {
-                flex: '0 0 400px',
-                minWidth: 400,
-                maxWidth: 400,
+                flex: '0 0 50%',
+                minWidth: 0,
+                maxWidth: '45%',
               },
             }}
           >
-            {/* Warnings + Migration Time */}
-            <Box sx={{ width: '100%' }}>
-              {hasWarnings && (
-                <Box sx={{ display: 'flex', flexDirection: 'column', gap: '1px', mb: '1px' }}>
-                  {ENTITY_TYPES.filter(entity => needsWarning(effectiveRates[entity] || 0, upperLimits[entity] || 0)).map(entity => (
-                    <Alert key={entity} severity="warning" sx={{ py: 0.5 }}>
-                      {entity}: Effective rate ({Math.round(effectiveRates[entity])}/min) exceeds 80% of limit ({upperLimits[entity]}/min)
-                    </Alert>
-                  ))}
-                </Box>
-              )}
-              <Paper sx={{ width: '100%', p: { xs: 2, sm: 4 }, textAlign: 'center', backgroundColor: hasWarnings ? 'rgba(255, 193, 7, 0.2)' : 'rgba(76, 175, 80, 0.2)', border: 2, borderColor: hasWarnings ? 'warning.main' : 'primary.main', boxSizing: 'border-box' }}>
-                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 1 }}>
-                  <Box sx={{ flex: 1, minWidth: 0 }}>
-                    <Typography variant="overline" color="text.secondary">Estimated Migration Time</Typography>
-                    <Typography variant="h2" component="div" sx={{ fontWeight: 700, color: 'primary.main', fontFamily: 'monospace', letterSpacing: { xs: 1, sm: 4 }, mt: 1, fontSize: { xs: '2rem', sm: '3rem' } }}>
-                      {migrationTime}
-                    </Typography>
-                  </Box>
-                  <Button variant="outlined" onClick={handleDownloadReport} size="small">
-                    ⬇ Download Report
-                  </Button>
-                </Box>
+            {/* Migration Time */}
+            <Box sx={{ width: '100%', position: 'relative' }}>
+              <Typography variant="overline" sx={{ display: 'block', mb: 0.5, position: 'relative', color: 'white', fontSize: '1.2rem'}}>Estimated Migration Time:</Typography>
+              <Paper sx={{ width: '100%', p: { xs: 2, sm: 4 }, pt: { xs: 4, sm: 5 }, textAlign: 'center', backgroundColor: hasWarnings ? 'rgba(255, 193, 7, 0.2)' : 'rgba(76, 175, 80, 0.2)', border: 2, borderColor: hasWarnings ? 'warning.main' : 'primary.main', boxSizing: 'border-box', position: 'relative' }}>
+                <Button
+                  variant="contained"
+                  onClick={handleDownloadReport}
+                  size="small"
+                  disabled={hasInvalidMaxWrites}
+                  disableElevation
+                  sx={{
+                    position: 'absolute',
+                    top: 0,
+                    right: 0,
+                    minWidth: 0,
+                    padding: 1,
+                    backgroundColor: '#2e7d32',
+                    color: 'white',
+                    boxShadow: 'none',
+                    '&:hover': { backgroundColor: '#1b5e20', boxShadow: 'none' },
+                  }}
+                >
+                  ⬇ Download Report
+                </Button>
+                <Typography variant="h2" component="div" sx={{ fontWeight: 700, color: 'primary.main', fontFamily: 'monospace', letterSpacing: { xs: 1, sm: 4 }, fontSize: { xs: '2rem', sm: '3rem' } }}>
+                  {displayMigrationTime}
+                </Typography>
+                {(displayMigrationTime === '00:00:00' && !hasInvalidMaxWrites) && (
+                  <Typography variant="caption" sx={{ display: 'block', mt: 1, color: 'white' }}>
+                    Enter total counts in Entity Configuration
+                  </Typography>
+                )}
               </Paper>
             </Box>
 
-            {/* Entity Configuration - on small screen same width as Config+CES via flex */}
-            <Paper sx={{ width: '100%', p: '15px', backgroundColor: 'rgba(255,255,255,0.95)', boxSizing: 'border-box', '@media (min-width: 960px)': { minWidth: 400, maxWidth: 400 } }}>
+            {/* Entity Configuration - stretches to match right column height on large screen */}
+            <Paper sx={{ width: '100%', p: '15px', backgroundColor: 'rgba(255,255,255,0.95)', boxSizing: 'border-box', display: 'flex', flexDirection: 'column', minHeight: 0, '@media (min-width: 960px)': { flex: 1 } }}>
               <Typography variant="h6" gutterBottom>Entity Configuration</Typography>
-              <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
+              <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap', width: '100%', flex: 1, minHeight: 0 }}>
                 {ENTITY_TYPES.map(entity => (
-                  <Card key={entity} variant="outlined" sx={{ flex: '0 0 200px', minWidth: 200, maxWidth: 200 }}>
+                  <Card key={entity} variant="outlined" sx={{ flex: '1 1 0', minWidth: 0 }}>
                     <CardContent>
                       <Typography variant="subtitle2" color="primary">{entity}</Typography>
                       <TextField fullWidth size="small" label="Duration (sec)" type="text" inputMode="numeric" value={durations[entity] ?? ''} onChange={(e) => handleDurationChange(entity, e.target.value)} sx={{ mt: 1 }} />
-                      <TextField fullWidth size="small" label="Total count" value={formatWithCommas(totals[entity] ?? 0)} onChange={(e) => handleTotalChange(entity, e.target.value)} placeholder="0" inputProps={{ inputMode: 'numeric' }} sx={{ mt: 1 }} />
+                      <TextField fullWidth size="small" label="Total count" value={totals[entity] > 0 ? String(totals[entity]) : ''} onChange={(e) => handleTotalChange(entity, e.target.value)} placeholder="Enter total count" inputProps={{ inputMode: 'numeric' }} sx={{ mt: 1 }} />
                       <TextField fullWidth size="small" label="Max writes" type="text" inputMode="numeric" value={maxWrites[entity] ?? ''} onChange={(e) => handleMaxWritesChange(entity, e.target.value)} sx={{ mt: 1 }} />
                     </CardContent>
                   </Card>
@@ -280,11 +371,10 @@ function App() {
             </Paper>
           </Box>
 
-          {/* Column 2 & 3 (large screen) or Row 2 (small screen): Configuration | CES Write Limits */}
-          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3, '@media (min-width: 500px)': { flexDirection: 'row' }, '@media (min-width: 960px)': { flex: 1, minWidth: 0 } }}>
+          {/* Column 2 & 3 (45% on large screen): Configuration | CES Write Limits */}
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3, '@media (min-width: 500px)': { flexDirection: 'row' }, '@media (min-width: 960px)': { flex: '0 0 50%', minWidth: 0, maxWidth: '50%' } }}>
             <Paper sx={{ flex: 1, minWidth: 280, p: { xs: 2, sm: 3 }, backgroundColor: 'rgba(255,255,255,0.95)', minHeight: 320 }}>
-              <Typography variant="h6" gutterBottom>Configuration</Typography>
-              <Typography variant="h6" gutterBottom>Configuration</Typography>
+              <Typography variant="h6" gutterBottom>Migration Configuration</Typography>
             <Box sx={{ mb: 2 }}>
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 0.5 }}>
                 <Typography flex={1}>Batch Size</Typography>
