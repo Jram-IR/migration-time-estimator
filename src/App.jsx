@@ -320,6 +320,11 @@ function App() {
                 <Typography variant="h2" component="div" sx={{ fontWeight: 700, color: 'primary.main', fontFamily: 'monospace', letterSpacing: { xs: 1, sm: 4 }, fontSize: { xs: '2rem', sm: '3rem' } }}>
                   {displayMigrationTime}
                 </Typography>
+                {(displayMigrationTime === '00:00:00' && !hasInvalidMaxWrites) && (
+                  <Typography variant="caption" sx={{ display: 'block', mt: 1, color: 'text.secondary' }}>
+                    Enter total counts in Entity Configuration
+                  </Typography>
+                )}
               </Paper>
             </Box>
 
@@ -332,7 +337,7 @@ function App() {
                     <CardContent>
                       <Typography variant="subtitle2" color="primary">{entity}</Typography>
                       <TextField fullWidth size="small" label="Duration (sec)" type="text" inputMode="numeric" value={durations[entity] ?? ''} onChange={(e) => handleDurationChange(entity, e.target.value)} sx={{ mt: 1 }} />
-                      <TextField fullWidth size="small" label="Total count" value={totals[entity] !== undefined && totals[entity] !== null ? String(totals[entity]) : ''} onChange={(e) => handleTotalChange(entity, e.target.value)} placeholder="0" inputProps={{ inputMode: 'numeric' }} sx={{ mt: 1 }} />
+                      <TextField fullWidth size="small" label="Total count" value={totals[entity] > 0 ? String(totals[entity]) : ''} onChange={(e) => handleTotalChange(entity, e.target.value)} placeholder="0 — enter count to estimate" inputProps={{ inputMode: 'numeric' }} sx={{ mt: 1 }} />
                       <TextField fullWidth size="small" label="Max writes" type="text" inputMode="numeric" value={maxWrites[entity] ?? ''} onChange={(e) => handleMaxWritesChange(entity, e.target.value)} sx={{ mt: 1 }} />
                     </CardContent>
                   </Card>
