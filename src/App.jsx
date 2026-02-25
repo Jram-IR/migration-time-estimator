@@ -337,7 +337,7 @@ function App() {
                     <CardContent>
                       <Typography variant="subtitle2" color="primary">{entity}</Typography>
                       <TextField fullWidth size="small" label="Duration (sec)" type="text" inputMode="numeric" value={durations[entity] ?? ''} onChange={(e) => handleDurationChange(entity, e.target.value)} sx={{ mt: 1 }} />
-                      <TextField fullWidth size="small" label="Total count" value={totals[entity] > 0 ? String(totals[entity]) : ''} onChange={(e) => handleTotalChange(entity, e.target.value)} placeholder="0 — enter count to estimate" inputProps={{ inputMode: 'numeric' }} sx={{ mt: 1 }} />
+                      <TextField fullWidth size="small" label="Total count" value={totals[entity] > 0 ? String(totals[entity]) : ''} onChange={(e) => handleTotalChange(entity, e.target.value)} placeholder="Enter total count" inputProps={{ inputMode: 'numeric' }} sx={{ mt: 1 }} />
                       <TextField fullWidth size="small" label="Max writes" type="text" inputMode="numeric" value={maxWrites[entity] ?? ''} onChange={(e) => handleMaxWritesChange(entity, e.target.value)} sx={{ mt: 1 }} />
                     </CardContent>
                   </Card>
