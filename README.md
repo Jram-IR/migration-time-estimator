@@ -8,7 +8,7 @@ A React web application that calculates estimated migration time based on config
 - **CES Write Limits**: Editable TPM values for Company, Site, and Contact (for 4x.large instance)
 - **Preset Management**: Save and switch between CES limit configurations (stored in cookies)
 - **Entity Configuration**: Duration per entity type, total counts, buffer time %, max writes per entity
-- **Real-time Estimate**: Live migration time calculation displayed in hh:mm:ss format
+- **Real-time Estimate**: Live migration time calculation displayed in dd:hh:mm:ss format (D=days, H=hours, M=minutes, S=seconds)
 - **CES Limit Warnings**: Alerts when effective rate exceeds 80% of CES limits (< 20% leeway)
 
 ## Getting Started
