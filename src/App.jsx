@@ -342,7 +342,7 @@ function App() {
                 >
                   ⬇ Download Report
                 </Button>
-                <Typography variant="h2" component="div" sx={{ fontWeight: 700, color: 'primary.main', fontFamily: 'monospace', letterSpacing: { xs: 1, sm: 4 }, fontSize: { xs: '2rem', sm: '3rem' } }}>
+                <Typography variant="h2" component="div" sx={{ fontWeight: 700, color: '#42a5f5', fontFamily: 'monospace', letterSpacing: { xs: 1, sm: 4 }, fontSize: { xs: '2rem', sm: '3rem' } }}>
                   {displayMigrationTime}
                 </Typography>
                 {(displayMigrationTime === '00D:00H:00M:00S' && !hasInvalidMaxWrites) && (
