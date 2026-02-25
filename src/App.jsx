@@ -124,7 +124,7 @@ function App() {
       });
     } catch (err) {
       return {
-        migrationTime: '00D:00H:00M:00S',
+        migrationTime: '00 Day(s):00 Hour(s):00 Min(s):00 Second(s)',
         effectiveRates: {},
         upperLimits: {},
         hasWarnings: {},
@@ -345,7 +345,7 @@ function App() {
                 <Typography variant="h2" component="div" sx={{ fontWeight: 700, color: 'primary.main', fontFamily: 'monospace', letterSpacing: { xs: 1, sm: 4 }, fontSize: { xs: '2rem', sm: '3rem' } }}>
                   {displayMigrationTime}
                 </Typography>
-                {(displayMigrationTime === '00D:00H:00M:00S' && !hasInvalidMaxWrites) && (
+                {(displayMigrationTime === '00 Day(s):00 Hour(s):00 Min(s):00 Second(s)' && !hasInvalidMaxWrites) && (
                   <Typography variant="caption" sx={{ display: 'block', mt: 1, color: 'white' }}>
                     Enter total counts in Entity Configuration
                   </Typography>
