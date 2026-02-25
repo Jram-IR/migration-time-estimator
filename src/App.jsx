@@ -124,7 +124,7 @@ function App() {
       });
     } catch (err) {
       return {
-        migrationTime: '00:00:00',
+        migrationTime: '00D:00H:00M:00S',
         effectiveRates: {},
         upperLimits: {},
         hasWarnings: {},
@@ -342,10 +342,10 @@ function App() {
                 >
                   ⬇ Download Report
                 </Button>
-                <Typography variant="h2" component="div" sx={{ fontWeight: 700, color: 'primary.main', fontFamily: 'monospace', letterSpacing: { xs: 1, sm: 4 }, fontSize: { xs: '2rem', sm: '3rem' } }}>
+                <Typography variant="h2" component="div" sx={{ fontWeight: 700, color: '#42a5f5', fontFamily: 'monospace', letterSpacing: { xs: 1, sm: 4 }, fontSize: { xs: '2rem', sm: '3rem' } }}>
                   {displayMigrationTime}
                 </Typography>
-                {(displayMigrationTime === '00:00:00' && !hasInvalidMaxWrites) && (
+                {(displayMigrationTime === '00D:00H:00M:00S' && !hasInvalidMaxWrites) && (
                   <Typography variant="caption" sx={{ display: 'block', mt: 1, color: 'white' }}>
                     Enter total counts in Entity Configuration
                   </Typography>

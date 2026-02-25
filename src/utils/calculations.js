@@ -54,16 +54,17 @@ export function needsWarning(effectiveRate, upperLimit) {
 }
 
 /**
- * Format minutes to hh:mm:ss
+ * Format minutes to dd:hh:mm:ss with unit indicators (D, H, M, S)
  */
 export function formatMigrationTime(totalMinutes) {
-  if (totalMinutes <= 0 || !isFinite(totalMinutes)) return '00:00:00';
+  if (totalMinutes <= 0 || !isFinite(totalMinutes)) return '00D:00H:00M:00S';
   const totalSeconds = Math.round(totalMinutes * 60);
-  const hours = Math.floor(totalSeconds / 3600);
+  const days = Math.floor(totalSeconds / 86400);
+  const hours = Math.floor((totalSeconds % 86400) / 3600);
   const minutes = Math.floor((totalSeconds % 3600) / 60);
   const seconds = totalSeconds % 60;
   const pad = (n) => n.toString().padStart(2, '0');
-  return `${pad(hours)}:${pad(minutes)}:${pad(seconds)}`;
+  return `${pad(days)}D:${pad(hours)}H:${pad(minutes)}M:${pad(seconds)}S`;
 }
 
 /**
@@ -200,7 +201,7 @@ export function generateReportCSV(report) {
     ['Total after buffer (min)', r.totalMinutesAfterBuffer?.toFixed(2) ?? '0'],
     [''],
     ['--- RESULT ---', ''],
-    ['Estimated Migration Time', r.formattedTime ?? '00:00:00'],
+    ['Estimated Migration Time', r.formattedTime ?? '00D:00H:00M:00S'],
   ];
 
   return rows.map(row => (Array.isArray(row) ? row : [row]).map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(',')).join('\n');
