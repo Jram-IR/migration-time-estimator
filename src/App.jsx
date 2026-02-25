@@ -210,11 +210,33 @@ function App() {
 
   return (
     <Box sx={{ minHeight: '100vh', background: 'linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%)', py: { xs: 2, sm: 4 }, px: { xs: 1.5, sm: 2 } }}>
-      <Typography variant="h4" component="h1" sx={{ color: 'white', textAlign: 'center', mb: { xs: 3, sm: 4 }, fontWeight: 700, letterSpacing: 1, fontSize: { xs: '1.5rem', sm: '2rem' } }}>
-        Migration Time Estimator
+      <Typography variant="h4" component="h1" sx={{ color: 'white', textAlign: 'center', mb: 1, fontWeight: 700, letterSpacing: 1, fontSize: { xs: '1.5rem', sm: '2rem' }, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 1 }}>
+        <Box component="span" sx={{ display: 'inline-flex', fontSize: { xs: '1.5rem', sm: '2rem' }, lineHeight: 1, color: 'white' }}>
+          <svg viewBox="0 0 64 64" width="1em" height="1em" style={{ display: 'block' }}>
+            <defs>
+              <linearGradient id="clockFace" x1="0%" y1="0%" x2="100%" y2="100%">
+                <stop offset="0%" stopColor="#f5f5f5" />
+                <stop offset="50%" stopColor="#e0e0e0" />
+                <stop offset="100%" stopColor="#9e9e9e" />
+              </linearGradient>
+              <linearGradient id="clockEdge" x1="0%" y1="0%" x2="0%" y2="100%">
+                <stop offset="0%" stopColor="#eeeeee" />
+                <stop offset="100%" stopColor="#212121" />
+              </linearGradient>
+              <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
+                <feDropShadow dx="2" dy="2" stdDeviation="2" floodColor="#000" floodOpacity="0.3" />
+              </filter>
+            </defs>
+            <circle cx="32" cy="32" r="28" fill="url(#clockEdge)" filter="url(#shadow)" />
+            <circle cx="32" cy="32" r="24" fill="url(#clockFace)" />
+            <circle cx="32" cy="32" r="2" fill="#212121" />
+            <line x1="32" y1="32" x2="32" y2="16" stroke="#212121" strokeWidth="2" strokeLinecap="round" />
+            <line x1="32" y1="32" x2="42" y2="36" stroke="#212121" strokeWidth="1.5" strokeLinecap="round" />
+          </svg>
+        </Box> Migration Time Estimator
       </Typography>
-      <Typography sx={{ color: 'white', textAlign: 'center', mb: { xs: 3, sm: 4 }, fontWeight: 100, letterSpacing: 1, fontSize: { xs: '1rem', sm: '1.5rem' } }}>
-        A simple tool to estimate migration times.
+      <Typography component="p" style={{ fontStyle: 'italic' }} sx={{ color: 'white', textAlign: 'center', mb: { xs: 3, sm: 4 }, fontWeight: 300, fontSize: { xs: '0.875rem', sm: '1rem' }, fontSynthesis: 'style' }}>
+        A simple tool to estimate migration times
       </Typography>
 
       {/* Warnings - outside main content, on top; clickable to open modal */}
