@@ -26,6 +26,24 @@ Then open http://localhost:5173 in your browser.
 npm run build
 ```
 
+## Deploy to Vercel
+
+This app is configured for [Vercel](https://vercel.com) deployment and can be deployed worldwide:
+
+1. **Via Vercel Dashboard** (recommended):
+   - Push this repo to GitHub
+   - Go to [vercel.com](https://vercel.com) and sign in
+   - Click "Add New Project" and import your repository
+   - Vercel will auto-detect the Vite config; deploy with the default settings
+
+2. **Via Vercel CLI**:
+   ```bash
+   npm i -g vercel
+   vercel
+   ```
+
+The `vercel.json` config specifies the build command, output directory, and SPA routing.
+
 ## Tech Stack
 
 - React 19
