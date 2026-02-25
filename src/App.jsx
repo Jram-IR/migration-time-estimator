@@ -55,6 +55,27 @@ function parseInteger(str) {
   return digits === '' ? 0 : parseInt(digits, 10);
 }
 
+function MigrationTimeDisplay({ value }) {
+  if (value === 'N/A') return value;
+  const parts = value.split(':');
+  return (
+    <>
+      {parts.map((part, i) => {
+        const spaceIdx = part.indexOf(' ');
+        const num = spaceIdx >= 0 ? part.slice(0, spaceIdx) : part;
+        const unit = spaceIdx >= 0 ? part.slice(spaceIdx) : '';
+        return (
+          <Box component="span" key={i}>
+            {i > 0 && ':'}
+            {num}
+            <Box component="span" sx={{ fontSize: '0.45em', fontWeight: 500 }}>{unit}</Box>
+          </Box>
+        );
+      })}
+    </>
+  );
+}
+
 function downloadCSV(content, filename = 'migration-estimation-report.csv') {
   const blob = new Blob([content], { type: 'text/csv;charset=utf-8;' });
   const link = document.createElement('a');
@@ -343,7 +364,7 @@ function App() {
                   ⬇ Download Report
                 </Button>
                 <Typography variant="h2" component="div" sx={{ fontWeight: 700, color: 'primary.main', fontFamily: 'monospace', letterSpacing: { xs: 1, sm: 4 }, fontSize: { xs: '2rem', sm: '3rem' } }}>
-                  {displayMigrationTime}
+                  <MigrationTimeDisplay value={displayMigrationTime} />
                 </Typography>
                 {(displayMigrationTime === '00 Day(s):00 Hour(s):00 Min(s):00 Second(s)' && !hasInvalidMaxWrites) && (
                   <Typography variant="caption" sx={{ display: 'block', mt: 1, color: 'white' }}>
